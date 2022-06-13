@@ -1,0 +1,11 @@
+anndata==0.8.0,
+matplotlib~=3.5.1
+numpy>=1.21.6
+pandas~=1.4.2
+ray>=1.11.0
+scanpy==1.9.1
+scipy~=1.8.0
+statsmodels~=0.13.2
+scikit_learn>=1.0.2
+torch==1.11.0
+tqdm~=4.64.0
