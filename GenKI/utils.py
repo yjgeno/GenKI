@@ -73,14 +73,14 @@ def get_distance(z_m0, z_S0, z_m1, z_S1, by="KL"):
             temp_S1 = np.zeros((out_channels, out_channels), float)
             np.fill_diagonal(temp_S1, S1)
             if by == "KL":
-                # dis.append(_kl_mvn(m0, temp_S0, m1, temp_S1))
-                dis.append(
-                    (
-                        _kl_mvn(m0, temp_S0, m1, temp_S1)
-                        + _kl_mvn(m1, temp_S1, m0, temp_S0)
-                    )
-                    / 2
-                )
+                dis.append(_kl_mvn(m0, temp_S0, m1, temp_S1))
+                # dis.append(
+                #     (
+                #         _kl_mvn(m0, temp_S0, m1, temp_S1)
+                #         + _kl_mvn(m1, temp_S1, m0, temp_S0)
+                #     )
+                #     / 2
+                # )
             if by == "EMD":
                 dis.append(_wasserstein_dist2(m0, temp_S0, m1, temp_S1))
     except IndexError:  # out_channels == 1

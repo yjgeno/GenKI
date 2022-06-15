@@ -37,16 +37,16 @@ class Base():
             raise IndexError("require a valid cell label in adata.obs")
         else:
             self._counts = adata[adata.obs[obs_label] == target_cell, :].X 
-        self._counts = self._counts if scipy.sparse.issparse(self._counts) else scipy.sparse.csc_matrix(self._counts) # sparse 
+        self._counts = scipy.sparse.lil_matrix(self._counts) # sparse 
         pcNet_path = f"{GRN_file_dir}/{pcNet_name}.npz"
         if rebuild_GRN: 
             if verbose:
                 print("building GRN...")
             if os.path.isfile(pcNet_path):
-                self._net = scipy.sparse.load_npz(pcNet_path)
+                self._net = scipy.sparse.lil_matrix(scipy.sparse.load_npz(pcNet_path))
             else:
                 pcNet_np = make_pcNet(self._counts, nComp = 5, as_sparse = True, timeit = verbose, **kwargs) 
-                self._net = scipy.sparse.csc_matrix(pcNet_np) # np to sparse
+                self._net = scipy.sparse.lil_matrix(pcNet_np) # np to sparse
             os.makedirs(f"./{GRN_file_dir}", exist_ok = True) # create dir 
             scipy.sparse.save_npz(pcNet_path, self._net) # save GRN
             if verbose:

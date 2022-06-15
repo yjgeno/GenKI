@@ -143,11 +143,13 @@ def pmt(data, data_v, model, n=100, by="KL"):
             np.arange(n_cell), size=n_cell
         )  # bootstrap cell labels
         data_WT_p = Data(
-            x=torch.tensor(data.x[:, idx_pmt], dtype=torch.float),
+            # x=torch.tensor(data.x[:, idx_pmt], dtype=torch.float),
+            x=data.x[:, idx_pmt].clone().detach().requires_grad_(False),
             edge_index=data.edge_index,
         )
         data_KO_p = Data(
-            x=torch.tensor(data_v.x[:, idx_pmt], dtype=torch.float),
+            # x=torch.tensor(data_v.x[:, idx_pmt], dtype=torch.float),
+            x=data_v.x[:, idx_pmt].clone().detach().requires_grad_(False),
             edge_index=data_v.edge_index,
         )  # construct virtual data (KO) based on pmt WT
         z_mp, z_Sp = get_latent_vars(data_WT_p, model)
