@@ -59,7 +59,7 @@ def _wasserstein_dist2(m0, S0, m1, S1):
     )
 
 
-def get_distance(z_m0, z_S0, z_m1, z_S1, by="KL"):
+def get_distance(z_m0, z_S0, z_m1, z_S1, by = "KL"):
     """
     z_m0, z_S0: latent means and sigma from WT data.
     z_mv, z_Sv: latent means and sigma from virtual data.
@@ -83,7 +83,7 @@ def get_distance(z_m0, z_S0, z_m1, z_S1, by="KL"):
                 # )
             if by == "EMD":
                 dis.append(_wasserstein_dist2(m0, temp_S0, m1, temp_S1))
-    except IndexError:  # out_channels == 1
+    except IndexError:  # when out_channels == 1
         for m0, S0, m1, S1 in zip(z_m0, z_S0, z_m1, z_S1):
             if by == "KL":
                 dis.append((_kl_1d(m0, S0, m1, S1) + _kl_1d(m1, S1, m0, S0)) / 2)
@@ -95,19 +95,19 @@ def get_distance(z_m0, z_S0, z_m1, z_S1, by="KL"):
 def get_generank(
     data,
     distance,
-    null=None,
-    rank=True,
-    reverse=False,
-    bagging=0.05,
-    hit_cut=0.95,
-    save_significant_as=None,
+    null = None,
+    rank: bool = True,
+    reverse: bool = False,
+    bagging: float = 0.05,
+    cutoff: float = 0.95,
+    save_significant_as: bool = None,
 ):
     """
-    data: torch_geometric.data.data.Data, WT data.
+    data: torch_geometric.data.data.Data.
     distance: array-like, output of get_distance.
     null: array-like, output of pmt.
     bagging: threshold for bagging top names at each permutation.
-    hit_cut: threshold for frequency of bagging after all permutations.
+    cutoff: threshold for frequency of bagging after all permutations.
     save_significant_as: .txt file name of significant genes that will be saved in result for enrichment test.
     """
     if null is not None:
@@ -127,17 +127,17 @@ def get_generank(
             columns=["dis"],
         )
         df_KL[["index", "hit"]] = freq.astype(int)
-        hit = int(null.shape[0] * hit_cut)
+        hit = int(null.shape[0] * cutoff)
         df_KL = df_KL[(df_KL.hit >= hit) & (df_KL.dis != 0)]
         if rank:
             df_KL.sort_values(by=["dis", "hit"], ascending=reverse, inplace=True)
         if save_significant_as is not None:
             output = list(df_KL.index)
-            os.makedirs("./result", exist_ok=True)
+            os.makedirs("result", exist_ok=True)
             np.savetxt(
-                f"./result/{save_significant_as}.txt", output, fmt="%s", delimiter=","
+                os.path.join("result", f"{save_significant_as}.txt"), output, fmt="%s", delimiter=","
             )
-            print(f'save {len(output)} genes to "./result/{save_significant_as}.txt"')
+            print(f"save {len(output)} genes to \"./result/{save_significant_as}.txt\"")
     else:
         df_KL = pd.DataFrame(
             data=distance, index=np.array(data.y), columns=["dis"]
@@ -151,7 +151,7 @@ def get_generank(
 
 def get_generank_gsea(data, distance, reverse=False, save_as=None):
     """
-    data: torch_geometric.data.data.Data, WT data.
+    data: torch_geometric.data.data.Data, 
     distance: array-like, output of get_distance.
     save_as: str, .txt file name that will be saved in result for GSEA.
     """
@@ -171,7 +171,7 @@ def get_generank_gsea(data, distance, reverse=False, save_as=None):
         np.savetxt(
             f"./result/GSEA_{save_as}.txt", output_gsea, fmt="%s", delimiter="\t"
         )
-        print(f'save ranked genes to "./result/GSEA_{save_as}.txt"')
+        print(f"save ranked genes to \"./result/GSEA_{save_as}.txt\"")
     return df_gsea
 
 
@@ -210,14 +210,14 @@ def get_sys_KO_cluster(
             f"TSNE perplexity: {perplexity}, # Clustering: {n_cluster}\nThe cluster containing {obj._target_gene} has {len(cluster_gene_names)} genes"
         )
     if save_as is not None:
-        os.makedirs("./result", exist_ok=True)
+        os.makedirs("result", exist_ok=True)
         np.savetxt(
-            f"./result/sys_KO_{save_as}.txt",
+            os.path.join("result", f"sys_KO_{save_as}.txt"),
             cluster_gene_names,
             fmt="%s",
             delimiter="\t",
         )
-        print(f'save ranked genes to "./result/sys_KO_{save_as}.txt"')
+        print(f"save ranked genes to \"./result/sys_KO_{save_as}.txt\"")
     if show_TSNE:
         fig, ax = plt.subplots(figsize=(8, 8), dpi=80)
         colors = [

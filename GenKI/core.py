@@ -5,14 +5,12 @@ import os
 import torch 
 from torch_geometric.data import Data 
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-
+# from tqdm import tqdm
 from .pcNet import make_pcNet
-from .model import get_latent_vars
-from .utils import get_distance
+from .dataLoader import check_adata
 
 
-class Base():
+class scBase():
     def __init__(self, 
             adata: anndata.AnnData, 
             target_gene: list[str], 
@@ -23,6 +21,7 @@ class Base():
             pcNet_name: str = "pcNet", 
             verbose: bool = False,
             **kwargs): 
+        check_adata(adata)
         self._gene_names = list(adata.var_names)
         if all([g not in self._gene_names for g in target_gene]):
             raise IndexError("The input target gene should be in the gene list of adata")
@@ -30,7 +29,7 @@ class Base():
             self._target_gene = target_gene
             # self._idx_KO = self._gene_names.index(target_gene)
         if target_cell is None:
-            self._counts = adata.X # use all cells
+            self._counts = adata.X # use all cells, standardized counts
             if verbose:
                 print(f"use all the cells ({self._counts.shape[0]}) in adata")
         elif not (obs_label in adata.obs.keys()):
@@ -38,28 +37,37 @@ class Base():
         else:
             self._counts = adata[adata.obs[obs_label] == target_cell, :].X 
         self._counts = scipy.sparse.lil_matrix(self._counts) # sparse 
-        pcNet_path = f"{GRN_file_dir}/{pcNet_name}.npz"
+        pcNet_path = os.path.join(GRN_file_dir, f"{pcNet_name}.npz")
         if rebuild_GRN: 
             if verbose:
-                print("building GRN...")
-            if os.path.isfile(pcNet_path):
-                self._net = scipy.sparse.lil_matrix(scipy.sparse.load_npz(pcNet_path))
-            else:
-                pcNet_np = make_pcNet(self._counts, nComp = 5, as_sparse = True, timeit = verbose, **kwargs) 
-                self._net = scipy.sparse.lil_matrix(pcNet_np) # np to sparse
-            os.makedirs(f"./{GRN_file_dir}", exist_ok = True) # create dir 
+                print("build GRN")
+            self._net = make_pcNet(adata.layers["norm"], nComp = 5, as_sparse = True, timeit = verbose, **kwargs)           
+            os.makedirs(GRN_file_dir, exist_ok = True) # create dir 
             scipy.sparse.save_npz(pcNet_path, self._net) # save GRN
+            # scipy.sparse.lil_matrix(pcNet_np) # np to sparse
             if verbose:
-                print(f'GRN has been built and saved in "{pcNet_path}"')
+                print(f"GRN has been built and saved in \"{pcNet_path}\"")
         else:
             try:
                 if verbose:
-                    print(f'loading GRN from "{pcNet_path}"')
+                    print(f"loading GRN from \"{pcNet_path}\"")
                 self._net = scipy.sparse.load_npz(pcNet_path)
             except ImportError:
                 print("require npz file name")
         if verbose:
             print("init completed\n")  
+
+    @property
+    def counts(self):
+        return self.counts
+
+    @property
+    def net(self):
+        return self._net
+
+    @property
+    def target_gene(self):
+        return self._target_gene
 
 
     def __len__(self):
@@ -70,12 +78,14 @@ class Base():
         return [self._gene_names.index(g) for g in gene_name]  # return gene index
 
 
-    def __str__(self):
-        info = f'*** Base Object ***\n ._counts: {self._counts.shape}\n ._net: {self._net.shape}\n ._target_gene: {self._target_gene}' 
+    def __repr__(self):
+        info = f"counts: {self._counts.shape}\n"\
+        f"net: {self._net.shape}\n"\
+        f"target_gene: {self._target_gene}"
         return info
 
 
-class GenKI(Base):
+class GenKI(scBase):
     def __init__(self, 
             adata: anndata.AnnData, 
             target_gene: list[str], 
@@ -86,7 +96,15 @@ class GenKI(Base):
             pcNet_name: str = "pcNet", 
             verbose: bool = True,
             **kwargs):
-        super().__init__(adata, target_gene, target_cell, obs_label, GRN_file_dir, rebuild_GRN, pcNet_name, verbose, **kwargs)
+        super().__init__(adata, 
+                         target_gene, 
+                         target_cell, 
+                         obs_label, 
+                         GRN_file_dir, 
+                         rebuild_GRN, 
+                         pcNet_name, 
+                         verbose, 
+                         **kwargs)
         self.verbose = verbose
         self.thre = 85
         self.edge_index = torch.tensor(self._build_edges(), dtype = torch.long) # dense np to tensor
@@ -103,14 +121,20 @@ class GenKI(Base):
         edge_index_np = np.asarray(np.where(grn_to_use > 0), dtype = int)
         return edge_index_np # dense np
 
+    def load_data(self):
+        return self._data_init()
 
-    def data_init(self):
+    def load_kodata(self):
+        return self._KO_data_init()
+
+
+    def _data_init(self):
         counts = self._counts.toarray() if scipy.sparse.issparse(self._counts) else self._counts
         x = torch.tensor(counts.T, dtype = torch.float) # define x
         return Data(x = x, edge_index = self.edge_index, y = self._gene_names)
 
 
-    def KO_data_init(self):
+    def _KO_data_init(self):
         # KO edges
         mask = ~(torch.isin(self.edge_index[0], torch.tensor(self(self._target_gene))) + torch.isin(self.edge_index[1], torch.tensor(self(self._target_gene))))
         edge_index_KO = self.edge_index[:, mask] # torch.long
@@ -121,7 +145,7 @@ class GenKI(Base):
         counts_KO = counts_KO.toarray() if scipy.sparse.issparse(counts_KO) else counts_KO
         x_KO = torch.tensor(counts_KO.T, dtype = torch.float) # define counts (KO)
         if self.verbose:
-            print(f'set expression of "{self._target_gene}" to zeros and remove edges')
+            print(f"set expression of \"{self._target_gene}\" to zeros and remove edges")
         return Data(x = x_KO, edge_index = edge_index_KO, y = self._gene_names)
 
 
@@ -202,26 +226,27 @@ class GenKI(Base):
         return Data(x = x_OE, edge_index = edge_index_OE, y = self._gene_names)
 
 
-    def run_sys_KO(self, model, genelist):
-        '''
-        model: a trained VGAE model.
-        genelist: array-like, gene list to be systematic KO
-        '''
-        self.verbose = False
-        g_orig = self._target_gene 
-        data = self.data_init()
-        z_m0, z_S0 = get_latent_vars(data, model)
-        sys_res = []
-        for g in tqdm(genelist, desc = "systematic KO...", total = len(genelist)):
-            if g not in self._gene_names:
-                raise IndexError(f'"{g}" is not in the object')
-            else:  
-                self._target_gene = g # reset KO gene
-                data_v = self.KO_data_init()
-                z_mv, z_Sv = get_latent_vars(data_v, model)
-                dis = get_distance(z_mv, z_Sv, z_m0, z_S0, by = "KL")
-                sys_res.append(dis)
-        self._target_gene = g_orig
-        # print(self._target_gene)
-        self.verbose = True
-        return np.array(sys_res) 
+    # def run_sys_KO(self, model, genelist):
+    #     '''
+    #     model: a trained VGAE model.
+    #     genelist: array-like, gene list to be systematic KO
+    #     '''
+    #     self.verbose = False
+    #     g_orig = self._target_gene 
+    #     data = self.data_init()
+    #     z_m0, z_S0 = get_latent_vars(data, model)
+    #     sys_res = []
+    #     from tqdm import tqdm
+    #     for g in tqdm(genelist, desc = "systematic KO...", total = len(genelist)):
+    #         if g not in self._gene_names:
+    #             raise IndexError(f'"{g}" is not in the object')
+    #         else:  
+    #             self._target_gene = g # reset KO gene
+    #             data_v = self.KO_data_init()
+    #             z_mv, z_Sv = get_latent_vars(data_v, model)
+    #             dis = get_distance(z_mv, z_Sv, z_m0, z_S0, by = "KL")
+    #             sys_res.append(dis)
+    #     self._target_gene = g_orig
+    #     # print(self._target_gene)
+    #     self.verbose = True
+    #     return np.array(sys_res) 

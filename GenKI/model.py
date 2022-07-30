@@ -1,165 +1,142 @@
-import numpy as np
 import torch
-from torch_geometric.data import Data
-from torch_geometric.nn import GCNConv
-from torch_geometric.nn import VGAE
-import torch.utils.tensorboard as tb
-import os
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-
-from .utils import get_distance
+from torch_geometric.utils import negative_sampling
 
 
-class VariationalGCNEncoder(torch.nn.Module):  # encoder
-    def __init__(self, in_channels, out_channels, hidden=2):
-        super(VariationalGCNEncoder, self).__init__()
-        self.conv1 = GCNConv(in_channels, hidden * out_channels)
-        self.conv_mu = GCNConv(hidden * out_channels, out_channels)
-        self.conv_logstd = GCNConv(hidden * out_channels, out_channels)
-
-    def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index).relu()
-        return self.conv_mu(x, edge_index), self.conv_logstd(x, edge_index)
+EPS = 1e-15
+MAX_LOGSTD = 10
 
 
-def train_VGAEmodel(
-    data, out_channels=2, epochs=100, lr=0.01, log_dir="log_dir", verbose=True
-):
-    if log_dir is not None:
-        train_logger = tb.SummaryWriter(os.path.join(log_dir, "train"))
-    torch.manual_seed(42)
-    # parameters
-    num_features = data.num_features
-
-    # model
-    model = VGAE(VariationalGCNEncoder(num_features, out_channels))
-
-    # to cuda
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    data.x = data.x.to(device)
-    data.edge_index = data.edge_index.to(device)
-
-    # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    # optimizer = torch.optim.SGD(model.parameters(), lr = lr, momentum = 0.9, weight_decay = 1e-6)
-    global_step = 0
-
-    for epoch in range(epochs):
-        model.train()
-        optimizer.zero_grad()
-        z = model.encode(data.x, data.edge_index)
-
-        recon_loss = model.recon_loss(z, data.edge_index)
-        kl_loss = model.kl_loss()
-        # print('recon_loss: {:.4f}'.format(float(loss)), 'kl_loss: {:.4f}'.format(float(kl_loss)))
-        # loss = recon_loss + 0.3 * kl_loss
-        loss = recon_loss + (1 / data.num_nodes) * kl_loss
-        if log_dir is not None:
-            train_logger.add_scalar("recon_loss", float(recon_loss), global_step)
-            train_logger.add_scalar("kl_loss", float(kl_loss), global_step)
-            train_logger.add_scalar("loss", float(loss), global_step)
-        loss.backward()
-        optimizer.step()
-        global_step += 1
-        if verbose:
-            print("Epoch: {:03d}, loss: {:.4f}".format(epoch, float(loss)))
-    return model
-
-
-def save_model(model, name: str):
-    """
-    model: a trained VGAE model.
-    name: str, name of .th file that will be saved in model.
-    """
-    if isinstance(model, VGAE):
-        os.makedirs("./model", exist_ok=True)
-        print(f'save model parameters to "./model/{name}.th"')
-        return torch.save(model.state_dict(), f"./model/{name}.th")
+def reset(value):
+    if hasattr(value, 'reset_parameters'):
+        value.reset_parameters()
     else:
-        raise ValueError(f"model type {str(type(model))} not supported")
+        for child in value.children() if hasattr(value, 'children') else []:
+            reset(child)
 
 
-def load_model(obj, name: str, out_channels=2):
+class InnerProductDecoder(torch.nn.Module):
+    """The inner product decoder."""
+    def forward(self, z, edge_index, sigmoid=True):
+        value = (z[edge_index[0]] * z[edge_index[1]]).sum(dim=1)
+        return torch.sigmoid(value) if sigmoid else value
+
+    def forward_all(self, z, sigmoid=True):
+        adj = torch.matmul(z, z.t())
+        return torch.sigmoid(adj) if sigmoid else adj
+
+
+class GAE(torch.nn.Module):
+    """The Graph Auto-Encoder model."""
+    def __init__(self, encoder, decoder=None):
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = InnerProductDecoder() if decoder is None else decoder
+        GAE.reset_parameters(self)
+
+    def reset_parameters(self):
+        reset(self.encoder)
+        reset(self.decoder)
+
+    def encode(self, *args, **kwargs):
+        return self.encoder(*args, **kwargs)
+
+    def decode(self, *args, **kwargs):
+        return self.decoder(*args, **kwargs)
+
+    def recon_loss(self, z, pos_edge_index, neg_edge_index=None):
+        """Given latent embeddings z, computes the binary cross
+        entropy loss for positive edges pos_edge_index and negative
+        sampled edges.
+
+        Args:
+        z (Tensor): The latent embeddings.
+        pos_edge_index (LongTensor): The positive edges to train against.
+        neg_edge_index (LongTensor, optional): The negative edges to train
+            against. If not given, uses negative sampling to calculate
+            negative edges. (default: :obj:`None`)
+        """
+
+        pos_loss = -torch.log(
+            self.decoder(z, pos_edge_index, sigmoid=True) + EPS).mean()
+
+        if neg_edge_index is None:
+            neg_edge_index = negative_sampling(pos_edge_index, z.size(0))
+        neg_loss = -torch.log(1 -
+                              self.decoder(z, neg_edge_index, sigmoid=True) +
+                              EPS).mean()
+
+        return pos_loss + neg_loss
+
+    def test(self, z, pos_edge_index, neg_edge_index):
+        """Given latent embeddings z, positive edges
+        pos_edge_index and negative edges neg_edge_index
+        computes metrics.
+
+        Args:
+        z (Tensor): The latent embeddings.
+        pos_edge_index (LongTensor): The positive edges to evaluate
+            against.
+        neg_edge_index (LongTensor): The negative edges to evaluate
+            against.
+        """
+        from sklearn.metrics import average_precision_score, roc_auc_score #f1_score, confusion_matrix
+
+        pos_y = z.new_ones(pos_edge_index.size(1))
+        neg_y = z.new_zeros(neg_edge_index.size(1))
+        y = torch.cat([pos_y, neg_y], dim=0)
+
+        pos_pred = self.decoder(z, pos_edge_index, sigmoid=True)
+        neg_pred = self.decoder(z, neg_edge_index, sigmoid=True)
+        pred = torch.cat([pos_pred, neg_pred], dim=0)
+
+        y, pred = y.detach().cpu().numpy(), pred.detach().cpu().numpy()
+        # pred[pred < 0.5] = 0
+        # pred[pred >= 0.5] = 1
+        # tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
+
+        return roc_auc_score(y, pred), average_precision_score(y, pred) # f1_score(y, pred), [tn, fp, fn, tp]
+
+
+class VGAE(GAE):
+    """The Variational Graph Auto-Encoder model.
+
+    Args:
+    encoder (Module): The encoder module to compute :math:`\mu` and
+        :math:`\log\sigma^2`.
+    decoder (Module, optional): The decoder module. If set to :obj:`None`,
+        will default to the
+        :class:`torch_geometric.nn.models.InnerProductDecoder`.
+        (default: :obj:`None`)
     """
-    obj: a sc object.
-    name: str, name of .th file saved in model.
-    """
-    r = VGAE(VariationalGCNEncoder(obj._counts.shape[0], out_channels))
-    print(f'load model parameters from "./model/{name}.th"')
-    r.load_state_dict(
-        torch.load(f"./model/{name}.th", map_location=torch.device("cpu"))
-    )
-    return r
+    def __init__(self, encoder, decoder=None):
+        super().__init__(encoder, decoder)
 
+    def reparametrize(self, mu, logstd):
+        if self.training:
+            return mu + torch.randn_like(logstd) * torch.exp(logstd)
+        else:
+            return mu
 
-# after training
-def get_latent_vars(data, model, plot_latent_mu=False):
-    """
-    data: torch_geometric.data.data.Data, WT data.
-    model: a trained VGAE model.
-    plot_latent_z: bool, whether to plot nodes with random sampled latent features.
-    """
-    torch.manual_seed(42)
-    model.eval()
-    z = model.encode(data.x, data.edge_index)  # feed and get latent
-    z_m = model.__mu__.detach().numpy()
-    z_S = (model.__logstd__.exp() ** 2).detach().numpy()  # variance
-    if plot_latent_mu:
-        # z_np = z.detach().numpy()
-        fig, ax = plt.subplots(figsize=(6, 6), dpi=80)
-        if z_m.shape[1] == 2:
-            ax.scatter(z_m[:, 0], z_m[:, 1], s=4)
-        elif z_m.shape[1] == 1:
-            ax.hist(z_m, bins=60)
-        elif z_m.shape[1] == 3:
-            from mpl_toolkits.mplot3d import Axes3D
+    def encode(self, *args, **kwargs):
+        self.__mu__, self.__logstd__ = self.encoder(*args, **kwargs)
+        self.__logstd__ = self.__logstd__.clamp(max=MAX_LOGSTD)
+        z = self.reparametrize(self.__mu__, self.__logstd__)
+        return z
 
-            ax = Axes3D(fig)
-            ax.scatter(z_m[:, 0], z_m[:, 1], z_m[:, 2], s=4)
-        plt.show()
-    if z_m.shape[1] == 1:
-        z_m = z_m.flatten()
-        z_S = z_S.flatten()
-    return z_m, z_S
+    def kl_loss(self, mu=None, logstd=None):
+        """Computes the KL loss, either for the passed arguments :obj:`mu`
+        and :obj:`logstd`, or based on latent variables from last encoding.
 
-
-def pmt(data, data_v, model, n=100, by="KL"):
-    """
-    data: torch_geometric.data.data.Data, WT data.
-    data_v: torch_geometric.data.data.Data, virtual data.
-    model: a trained VGAE model from WT data.
-    n: int, # of permutation.
-    by: str, method for distance calculation of distributions.
-    """
-    # permutate cells order and compute KL div
-    n_cell = data.x.shape[1]
-    dis_p = []
-    np.random.seed(0)
-    for _ in tqdm(range(n), desc="Permutating", total=n):
-        # p: pmt, v: virtual, m: mean, S: sigma
-        idx_pmt = np.random.choice(
-            np.arange(n_cell), size=n_cell
-        )  # bootstrap cell labels
-        data_WT_p = Data(
-            # x=torch.tensor(data.x[:, idx_pmt], dtype=torch.float),
-            x=data.x[:, idx_pmt].clone().detach().requires_grad_(False),
-            edge_index=data.edge_index,
-        )
-        data_KO_p = Data(
-            # x=torch.tensor(data_v.x[:, idx_pmt], dtype=torch.float),
-            x=data_v.x[:, idx_pmt].clone().detach().requires_grad_(False),
-            edge_index=data_v.edge_index,
-        )  # construct virtual data (KO) based on pmt WT
-        z_mp, z_Sp = get_latent_vars(data_WT_p, model)
-        z_mvp, z_Svp = get_latent_vars(data_KO_p, model)
-        if by == "KL":
-            dis_p.append(get_distance(z_mvp, z_Svp, z_mp, z_Sp))  # order KL
-        # if by == 'reverse_KL':
-        #     dis_p.append(get_distance(z_mp, z_Sp, z_mvp, z_Svp)) # reverse order KL
-        if by == "t":
-            dis_p.append(get_distance(z_mvp, z_Svp, z_mp, z_Sp, by="t"))
-        if by == "EMD":
-            dis_p.append(get_distance(z_mvp, z_Svp, z_mp, z_Sp, by="EMD"))
-    return np.array(dis_p)
+        Args:
+        mu (Tensor, optional): The latent space for :math:`\mu`. If set to
+            :obj:`None`, uses the last computation of :math:`mu`.
+            (default: :obj:`None`)
+        logstd (Tensor, optional): The latent space for
+            :math:`\log\sigma`.  If set to :obj:`None`, uses the last
+            computation of :math:`\log\sigma^2`.(default: :obj:`None`)
+        """
+        mu = self.__mu__ if mu is None else mu
+        logstd = self.__logstd__ if logstd is None else logstd.clamp(
+            max=MAX_LOGSTD)
+        return -0.5 * torch.mean(
+            torch.sum(1 + 2 * logstd - mu**2 - logstd.exp()**2, dim=1))
