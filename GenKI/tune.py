@@ -19,7 +19,7 @@ def _transform_data(data):
     transform = RandomLinkSplit(is_undirected = True, 
                                 split_labels = True, 
                                 num_val = 0.05, 
-                                num_test = 0.1)
+                                num_test = 0.2)
     return transform(data)
 
 
@@ -39,11 +39,11 @@ def train(config, checkpoint_dir = None):
     out_channels = 2
 
     torch.manual_seed(config["seed"])
-    model = VGAE(VariationalGCNEncoder(data.num_features, out_channels))
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-
     train_data, val_data, test_data = _transform_data(data)
+    model = VGAE(VariationalGCNEncoder(data.num_features, out_channels))
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)  
     train_data, val_data, test_data = train_data.to(device), val_data.to(device), test_data.to(device) 
     optimizer = torch.optim.Adam(model.parameters(), lr = config["lr"], weight_decay = config["weight_decay"])
     # optimizer = torch.optim.SGD(model.parameters(), lr = config["lr"], momentum = 0.9, weight_decay = config["weight_decay"])

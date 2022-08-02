@@ -22,7 +22,7 @@ def boxcox_norm(x):
 def _t_stat(m0, S0, m1, S1):
     return (m0 - m1) / math.sqrt(
         S0**2 + S1**2
-    )  # / math.log(S1/S0) #math.sqrt(S0**2 + S1**2)
+    ) 
 
 
 def _kl_1d(m0, S0, m1, S1):
@@ -46,7 +46,6 @@ def _kl_mvn(m0, S0, m1, S1):
         np.linalg.det(S1) / np.linalg.det(S0)
     )  # np.sum(np.log(S1)) - np.sum(np.log(S0))
     quad_term = diff.T @ iS1 @ diff  # np.sum( (diff*diff) * iS1, axis=1)
-
     return 0.5 * (tr_term + det_term + quad_term - N)
 
 
@@ -100,7 +99,7 @@ def get_generank(
     reverse: bool = False,
     bagging: float = 0.05,
     cutoff: float = 0.95,
-    save_significant_as: bool = None,
+    save_significant_as: str = None,
 ):
     """
     data: torch_geometric.data.data.Data.
@@ -149,7 +148,10 @@ def get_generank(
     return df_KL
 
 
-def get_generank_gsea(data, distance, reverse=False, save_as=None):
+def get_generank_gsea(data, 
+                      distance, 
+                      reverse: bool = False, 
+                      save_as: str = None):
     """
     data: torch_geometric.data.data.Data, 
     distance: array-like, output of get_distance.
@@ -167,12 +169,32 @@ def get_generank_gsea(data, distance, reverse=False, save_as=None):
     ).T  # GSEA: [gene_name, value]
 
     if save_as is not None:
-        os.makedirs("./result", exist_ok=True)
+        os.makedirs("result", exist_ok=True)
         np.savetxt(
-            f"./result/GSEA_{save_as}.txt", output_gsea, fmt="%s", delimiter="\t"
+            os.path.join("result", "GSEA_{save_as}.txt"), output_gsea, fmt="%s", delimiter="\t"
         )
         print(f"save ranked genes to \"./result/GSEA_{save_as}.txt\"")
     return df_gsea
+
+
+def get_r2_score(data, geneset: list, target_gene: str):
+    import statsmodels.api as sm
+    # np.random.seed(4)
+
+    X = data.x.numpy().T # standardized counts
+    x_genes_idx = [data.y.index(g) for g in geneset]
+    y_genes_idx = data.y.index(target_gene)
+    x_genes = X[:, x_genes_idx].copy()#.toarray()
+    y_genes = X[:, y_genes_idx].copy()#.toarray()
+    # print(x_genes.shape, y_genes.shape)
+
+    result = sm.OLS(y_genes, x_genes).fit() # y, X
+    return result.rsquared, result.rsquared_adj
+    # for _ in range(30):
+    #     random_idx = np.random.choice(X.shape[1], x_genes.shape[1], replace = False)
+    #     random_genes = X[:, random_idx].copy()#.toarray()
+    #     result = sm.OLS(y_genes, random_genes).fit()
+    #     r2.append([result.rsquared, result.rsquared_adj])
 
 
 def get_sys_KO_cluster(
