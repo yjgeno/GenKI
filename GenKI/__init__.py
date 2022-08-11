@@ -1,2 +1,2 @@
-from .core import GenKI
+from .dataloader import DataLoader
 # from .train import VGAE_trainer

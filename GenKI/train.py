@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from torch_geometric.data import Data
-from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.nn import GCNConv
 from .model import VGAE
 import torch.utils.tensorboard as tb
@@ -10,6 +9,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from .utils import get_distance
+from .preprocesing import split_data
 
 
 class VariationalGCNEncoder(torch.nn.Module):  # encoder
@@ -28,11 +28,13 @@ class VGAE_trainer():
     def __init__(self, 
                  data, 
                  out_channels: int = 2, 
-                 epochs: int = 200, 
-                 lr: float = 2e-3, 
+                 epochs: int = 100,
+                 lr: float = 7e-4,
+                 weight_decay = 9e-4,
+                 beta: str = 1e-4,
                  log_dir: str = None, 
-                 verbose: bool = True,
-                 beta: str = 3e-3,
+                 verbose: bool = True,            
+                 seed: int = None,
                  **kwargs):
         self.num_features = data.num_features
         self.out_channels = out_channels
@@ -47,69 +49,68 @@ class VGAE_trainer():
         if beta is not None:
             self.beta = beta
         else:
-            self.beta = (1 / self.train_data.num_nodes)    
+            self.beta = (1 / self.train_data.num_nodes)   
+        self.weight_decay = weight_decay 
+        self.seed = seed
 
 
     def __repr__(self) -> str:
         return f"Hyperparameters\n"\
                f"epochs: {self.epochs}, lr: {self.lr}, beta: {self.beta:.4f}\n"
 
-    def _transformer(self, num_val = 0.05, num_test = 0.2, **kwargs):
-        if self.verbose:
-            print(f"Data split into Train ({1-num_val-num_test}), Valid ({num_val}), Test ({num_test})")
-        return RandomLinkSplit(is_undirected = True, 
-                                split_labels = True, 
-                                num_val = num_val, 
-                                num_test = num_test)
 
     # split data
-    def _transform_data(self, x_noise: float = None, edge_noise: float = None, **kwargs):
+    def _transform_data(self,
+                        x_noise: float = None, 
+                        edge_noise: float = None, 
+                        **kwargs
+                        ):
         """
         Args:
         x_noise: Standard deviation of white noise added to the training data. Defaults to None.
         edge_noise: Remove or add edges to the training data.
         """
-        from copy import deepcopy
-        data_ = deepcopy(self.data)
-
-        if x_noise is not None:
-            if self.verbose:
-                print(f"add white noise to data x, level: {x_noise} SD")
-            data_.x = data_.x + x_noise * torch.randn(data_.x.shape)
-            
+        # from copy import deepcopy
+        # data_ = deepcopy(self.data)
+        self.train_data, self.val_data, self.test_data = split_data(data = self.data, **kwargs) # fixed split
+        if x_noise is not None: # white noise on X
+            gamma = x_noise * torch.randn(self.train_data.x.shape)
+            self.train_data.x = 2**gamma * self.train_data.x
+            print(f"add white noise to training data x, level: {x_noise} SD")
+		
         if edge_noise is not None:
-            train_data_, _, _ = self._transformer(num_val = 0, num_test = 0)(data_) # upper diag of adjacent
-            total = train_data_.pos_edge_label_index.shape[1]
-            n = int(abs(edge_noise) * total)
-            if edge_noise > 0:
-                from torch_geometric.utils import negative_sampling        
-                fake_edge_index = negative_sampling(train_data_.pos_edge_label_index,  # care for data leakage
+            n_pos_edge = self.train_data.pos_edge_label_index.shape[1]
+            n = int(abs(edge_noise) * n_pos_edge)
+            print("Before:", self.train_data)
+            print("\n")
+            if edge_noise > 0: # fold edges
+                from torch_geometric.utils import negative_sampling
+                fake_pos_edge = negative_sampling(self.data.edge_index,  # then fake edges impossible appeared in test set: for data leakage
                                                     num_neg_samples= n,
-                                                    num_nodes = len(data_.x))
-                fake_edge_index = torch.cat((fake_edge_index, fake_edge_index[torch.LongTensor([1, 0])]), 1) # swap, diagonal stays
-                fake_edge_index = torch.unique(torch.cat((data_.edge_index, fake_edge_index), 1), dim = 1)        
-                if self.verbose:
-                    print(f"add noise to data edge, level: {edge_noise}: sampled {n} neg edges as pos")
-                    print("(orig)", data_.edge_index.shape[1], f"+ 2 * (n) {n} = (edges to use)", fake_edge_index.shape[1])            
-            else:
-                weights = torch.tensor([1/total] * total, dtype = torch.float) # uniform weights
-                if n > total:
+                                                    num_nodes = len(self.train_data.x))
+                new_pos_edge = torch.unique(torch.cat((self.train_data.pos_edge_label_index, fake_pos_edge), 1), dim = 1) 
+                new_edge = torch.cat((new_pos_edge, new_pos_edge[torch.LongTensor([1, 0])]), 1) # swap           
+                print(f"add noise to training data edge, level: {edge_noise}: add {n} edges")      
+            else: # ratio edges
+                if n > n_pos_edge:
                     raise ValueError("cannot retain edges more than the total")
+                weights = torch.tensor([1/n_pos_edge] * n_pos_edge, dtype = torch.float) # uniform weights
                 index = weights.multinomial(num_samples = n, replacement = False)
-                fake_edge_index = train_data_.pos_edge_label_index[:, index]
-                fake_edge_index = torch.cat((fake_edge_index, fake_edge_index[torch.LongTensor([1, 0])]), 1)
-                if self.verbose:
-                    print(f"sample data edge, ratio: {abs(edge_noise)}")
-                    print("(orig)", data_.edge_index.shape[1], "(edges to use)", fake_edge_index.shape[1])        
-            data_.edge_index = fake_edge_index
-        self.train_data, self.val_data, self.test_data = self._transformer()(data_)
+                new_pos_edge = self.train_data.pos_edge_label_index[:, index]
+                new_edge = torch.cat((new_pos_edge, new_pos_edge[torch.LongTensor([1, 0])]), 1)
+                # new_neg_edge = self.train_data.neg_edge_label_index[:, index]
+                # self.train_data.neg_edge_label_index = new_neg_edge
+                print(f"retain a portion of training data edge, level: {abs(edge_noise)}: retain {n} edges")   
+            self.train_data.edge_index, self.train_data.pos_edge_label_index = new_edge, new_pos_edge
+            print("After:", self.train_data)
 
 
     # refer to https://github.com/pyg-team/pytorch_geometric/blob/master/examples/autoencoder.py
     def train(self, **kwargs):
         global_step = 0
-        # torch.manual_seed(8096)
-        self._transform_data(**kwargs)
+        if self.seed is not None:
+            torch.manual_seed(self.seed) # 8096
+        self._transform_data(**kwargs) # get split data w/o noise
         self.model = VGAE(VariationalGCNEncoder(self.num_features, self.out_channels))
         
         # to cuda
@@ -117,7 +118,7 @@ class VGAE_trainer():
         self.model = self.model.to(device)
         self.train_data, self.val_data, self.test_data = self.train_data.to(device), self.val_data.to(device), self.test_data.to(device)
         
-        optimizer = torch.optim.Adam(self.model.parameters(), lr = self.lr, weight_decay = 9e-4)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr = self.lr, weight_decay = self.weight_decay)
         # optimizer = torch.optim.SGD(self.model.parameters(), lr = self.lr, momentum = 0.9, weight_decay = 5e-4)
 
         for epoch in range(self.epochs):
@@ -240,39 +241,40 @@ class VGAE_trainer():
 
 
 def eva(args):
-    import pickle
-    current_dir =  os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
-    with open(os.path.join(current_dir, "data.p"), 'rb') as f, open(os.path.join(current_dir, "data_ko.p"), 'rb') as f_ko:
-        data = pickle.load(f)
-        data_ko = pickle.load(f_ko)
-    data, data_ko = Data.from_dict(data), Data.from_dict(data_ko)
-    hyperparams = {"epochs": 100, 
-                    "lr": 7e-4, 
-                    "beta": 1e-4, 
-                    "seed": None}
+    from .preprocesing import load_gdata
+    CURRENT_DIR =  os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+    load_path = os.path.join(CURRENT_DIR, args.dir)
+    data = load_gdata(load_path, "data")   
+
     sensei = VGAE_trainer(data, 
-                         epochs=hyperparams["epochs"], 
-                         lr=hyperparams["lr"], 
-                         log_dir=args.logdir, 
-                         beta=hyperparams["beta"],
+                         epochs = args.epochs, 
+                         lr = args.lr, 
+                         log_dir = args.logdir, 
+                         beta = args.beta,
                          verbose = args.verbose,
+                         seed = args.seed, 
                          )
     sensei.train(edge_noise = args.e_noise, 
-                 x_noise = args.x_noise)
+                 x_noise = args.x_noise,
+                 dir = args.dir, load = True, # load split data
+                 )
     epoch, loss, auc, ap = sensei.final_metrics
+
+    save_path = os.path.join(CURRENT_DIR, "train_log")
+    os.makedirs(save_path, exist_ok = True)
     try:
-        f = open(os.path.join(current_dir, f'{args.train_out}.txt'), 'r')
+        f = open(os.path.join(save_path, f'{args.train_out}.txt'), 'r')
     except IOError:
-        f = open(os.path.join(current_dir, f'{args.train_out}.txt'), 'w')
+        f = open(os.path.join(save_path, f'{args.train_out}.txt'), 'w')
         f.writelines("Epoch,Loss,AUROC,AP\n")
     finally:  
-        f = open(os.path.join(current_dir, f'{args.train_out}.txt'), 'a')
+        f = open(os.path.join(save_path, f'{args.train_out}.txt'), 'a')
         f.writelines(f"{epoch:03d}, {loss:.4f}, {auc:.4f}, {ap:.4f}\n")					
         f.close()
     if args.do_test:
+        data_ko = load_gdata(load_path, "data_ko")
         print("continue")
-        from .utils import get_generank
-        from GenKI.utils import get_r2_score
+        from .utils import get_generank, get_r2_score
         z_mu, z_std = sensei.get_latent_vars(data)
         z_mu_KO, z_std_KO = sensei.get_latent_vars(data_ko)
         dis = get_distance(z_mu_KO, z_std_KO, z_mu, z_std, by = 'KL')
@@ -281,12 +283,12 @@ def eva(args):
         geneset = list(res.index)
         r2, r2_adj = get_r2_score(data, geneset[1:], geneset[0])
         try:
-            f = open(os.path.join(current_dir, f'{args.r2_out}.txt'), 'r')
+            f = open(os.path.join(save_path, f'{args.r2_out}.txt'), 'r')
         except IOError:
-            f = open(os.path.join(current_dir, f'{args.r2_out}.txt'), 'w')
+            f = open(os.path.join(save_path, f'{args.r2_out}.txt'), 'w')
             f.writelines("R2,R2_adj\n")
         finally:  
-            f = open(os.path.join(current_dir, f'{args.r2_out}.txt'), 'a')
+            f = open(os.path.join(save_path, f'{args.r2_out}.txt'), 'a')
             f.writelines(f"{r2:.4f}, {r2_adj:.4f}\n")					
             f.close()
 
@@ -295,18 +297,24 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     # parser.add_argument('file', type = str)
-    parser.add_argument('-l', '--logdir', type = str, default = None)
-    parser.add_argument('-e', '--e_noise', type = float, default = None)
-    parser.add_argument('-x', '--x_noise', type = float, default = None)
-    parser.add_argument('-v', '--verbose', action = 'store_true')
-    parser.add_argument('--train_out', type = str, default = 'sum_train')
-    parser.add_argument('--generank_out', type = str, default = 'gene_list')
-    parser.add_argument('--r2_out', type = str, default = 'gene_list')
-    parser.add_argument('--do_test', action = 'store_true')
+    parser.add_argument('--dir', type = str, default = "data")
+    parser.add_argument('--epochs', type = int, default = 100)
+    parser.add_argument('--lr', type = float, default = 7e-4)
+    parser.add_argument('--beta', type = float, default = 1e-4)
+    parser.add_argument('--seed', type = int, default = None)
+    parser.add_argument('--logdir', type = str, default = None)
+    parser.add_argument('-E', '--e_noise', type = float, default = None)
+    parser.add_argument('-X', '--x_noise', type = float, default = None)
+    parser.add_argument('-v', '--verbose', action = "store_true")
+    parser.add_argument('--train_out', type = str, default = "train_log")
+
+    parser.add_argument('--do_test', action = "store_true")
+    parser.add_argument('--generank_out', type = str, default = "gene_list")
+    parser.add_argument('--r2_out', type = str, default = "r2_score")
     args = parser.parse_args()
 
     eva(args)
-
-    # python -m GenKI.train -v --train_out train_sum --do_test --generank_out genelist --r2_out r2_score
+    # python -m GenKI.train --dir data --logdir log_dir/run0 --seed 8096 -E -0.1 -v
+    # python -m GenKI.train --dir data --train_out train_log --do_test --generank_out genelist --r2_out r2_score -v
 
 
