@@ -62,6 +62,7 @@ class VGAE_trainer():
     # split data
     def _transform_data(self,
                         x_noise: float = None, 
+                        x_dropout: float = None,
                         edge_noise: float = None, 
                         **kwargs
                         ):
@@ -72,11 +73,21 @@ class VGAE_trainer():
         """
         # from copy import deepcopy
         # data_ = deepcopy(self.data)
+        if x_dropout is not None:
+            mask = torch.FloatTensor(self.data.x.shape).uniform_() > x_dropout # % zeros
+            self.data.x = self.data.x * mask
+            print(f"force zeros to data x, dropout: {x_dropout}")
+
         self.train_data, self.val_data, self.test_data = split_data(data = self.data, **kwargs) # fixed split
         if x_noise is not None: # white noise on X
             gamma = x_noise * torch.randn(self.train_data.x.shape)
             self.train_data.x = 2**gamma * self.train_data.x
             print(f"add white noise to training data x, level: {x_noise} SD")
+        
+        # if x_dropout is not None:
+        #     mask = torch.FloatTensor(self.train_data.x.shape).uniform_() > x_dropout # % zeros
+        #     self.train_data.x = self.train_data.x * mask
+        #     print(f"force zeros to training data x, dropout: {x_dropout}")
 		
         if edge_noise is not None:
             n_pos_edge = self.train_data.pos_edge_label_index.shape[1]
@@ -256,7 +267,8 @@ def eva(args):
                          )
     sensei.train(edge_noise = args.e_noise, 
                  x_noise = args.x_noise,
-                 dir = args.dir, load = True, # load split data
+                 x_dropout = args.x_dropout,
+                 dir = args.dir, load = False, # load split data
                  )
     epoch, loss, auc, ap = sensei.final_metrics
 
@@ -296,8 +308,7 @@ def eva(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    # parser.add_argument('file', type = str)
-    parser.add_argument('--dir', type = str, default = "data")
+    parser.add_argument('--ddir', type = str, default = "data")
     parser.add_argument('--epochs', type = int, default = 100)
     parser.add_argument('--lr', type = float, default = 7e-4)
     parser.add_argument('--beta', type = float, default = 1e-4)
@@ -305,6 +316,7 @@ if __name__ == "__main__":
     parser.add_argument('--logdir', type = str, default = None)
     parser.add_argument('-E', '--e_noise', type = float, default = None)
     parser.add_argument('-X', '--x_noise', type = float, default = None)
+    parser.add_argument('-XO', '--x_dropout', type = float, default = None)
     parser.add_argument('-v', '--verbose', action = "store_true")
     parser.add_argument('--train_out', type = str, default = "train_log")
 
@@ -315,6 +327,7 @@ if __name__ == "__main__":
 
     eva(args)
     # python -m GenKI.train --dir data --logdir log_dir/run0 --seed 8096 -E -0.1 -v
+    # python -m GenKI.train --dir data_covid --logdir log_dir/sigma0_covid --lr 5e-3 --seed 8096 -v
     # python -m GenKI.train --dir data --train_out train_log --do_test --generank_out genelist --r2_out r2_score -v
 
 

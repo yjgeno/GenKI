@@ -15,7 +15,6 @@ from typing import Union
 from scipy import sparse
 import os 
 import pickle
-import torch
 from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric import seed_everything

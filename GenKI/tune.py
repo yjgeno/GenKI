@@ -82,7 +82,10 @@ def test_best_model(best_trial):
     print(f"Best trial test AP: {ap:.4f}")
 
 
-def main(num_samples, max_num_epochs = 100, gpus_per_trial = 0):
+def main(num_samples, 
+        max_num_epochs = 100, 
+        gpus_per_trial = 0,
+        save_as: str = "tune_result"):
     scheduler = ASHAScheduler(
         max_t = max_num_epochs, # max iteration
         grace_period = 10, # stop at least after this iteration
@@ -102,7 +105,7 @@ def main(num_samples, max_num_epochs = 100, gpus_per_trial = 0):
     print("Best trial valid AUROC: {}".format(best_trial.last_result["AUROC"]))
     print("Best trial valid AP: {}".format(best_trial.last_result["AP"]))
     test_best_model(best_trial) # only should run once
-    save_path = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), "tune_result.csv")
+    save_path = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), f"{save_as}.csv")
     result.dataframe().to_csv(save_path)
 
 
