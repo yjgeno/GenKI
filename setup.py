@@ -17,7 +17,7 @@ INSTALL_REQUIRES = [
         "scipy~=1.8.0",
         "statsmodels~=0.13.2",
         "scikit_learn>=1.0.2",
-        "torch==1.11.0",
+        # "torch==1.11.0",
         "tqdm~=4.64.0",
     ]
 
@@ -45,9 +45,7 @@ setup(
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     ],
-    python_requires='~=3.9.6',
     packages=PACKAGES,
     include_package_data=True, # MANIFEST
     install_requires=INSTALL_REQUIRES,
