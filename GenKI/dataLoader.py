@@ -147,7 +147,7 @@ class DataLoader(scBase):
         counts_KO = counts_KO.toarray() if scipy.sparse.issparse(counts_KO) else counts_KO
         x_KO = torch.tensor(counts_KO.T, dtype = torch.float) # define counts (KO)
         if self.verbose:
-            print(f"set expression of \"{self._target_gene}\" to zeros and remove edges")
+            print(f"set expression of {self._target_gene} to zeros and remove edges")
         return Data(x = x_KO, edge_index = edge_index_KO, y = self._gene_names)
 
 

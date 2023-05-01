@@ -8,6 +8,7 @@ import scanpy as sc
 # import io
 import os
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
+from sklearn.covariance import GraphicalLasso, GraphicalLassoCV
 # from time import time 
 
 # import matplotlib as mpl
@@ -30,13 +31,11 @@ from GenKI.train import VGAE_trainer
 from GenKI import utils
 from scTenifold import scTenifoldKnk
 
+N = 10
 
 def main(args):
-    file = args.data
-    # target_gene = args.KO
-
-    exp = pd.read_csv(f"SERGIO/De-noised_{file}/simulated_noNoise_0.csv", index_col=0)
-    gt_grn_df = pd.read_csv(f"SERGIO/De-noised_{file}/gt_GRN.csv", header=None)
+    exp = pd.read_csv(f"SERGIO/De-noised_{args.data}/simulated_noNoise_{args.data_id}.csv", index_col=0)
+    gt_grn_df = pd.read_csv(f"SERGIO/De-noised_{args.data}/gt_GRN.csv", header=None)
     inds = list(zip(gt_grn_df[0], gt_grn_df[1]))
     gt_grn = np.zeros((len(exp), len(exp))).astype(int)
     for ind in inds:
@@ -44,22 +43,32 @@ def main(args):
 
     genes = np.arange(len(exp)).astype(str)
     genes = np.char.add(["g"]*len(genes), genes)
-    idx = np.unique(gt_grn_df[0].to_numpy())
+    idx = gt_grn_df[0].value_counts().index.to_numpy()
     KO_genes = genes[idx] # gene list to be KO
-    print(KO_genes)
+    print(KO_genes[:N])
 
     ada = sc.AnnData(exp.values.T)
     ada.var_names = genes
+
+    corr_mat = np.corrcoef(ada.X.T) # corr
+    cov = GraphicalLassoCV(alphas=4).fit(ada.X) # GGM
+    ggm = GraphicalLasso(alpha=cov.alpha_, 
+                         max_iter=100,
+                         assume_centered=False)
+    res = ggm.fit(ada.X)
+    pre_ = np.around(res.precision_, decimals=6) 
+
+    # GenKI
     ada_WT = build_adata(ada, scale_data = True, uppercase=False)
 
-    for target_gene in KO_genes:
+    for target_gene in KO_genes[:N]:
         data_wrapper = gk.DataLoader(ada_WT, 
                         target_gene = [target_gene], 
                         target_cell = None, 
         #                 obs_label = None,
                         GRN_file_dir = 'GRNs',
                         rebuild_GRN = False,
-                        pcNet_name = f'pcNet_{file}_0_man', # build network
+                        pcNet_name = f'pcNet_{args.data}_{args.data_id}_man', # build network
                         cutoff = 85,
                         verbose = False,
                             )
@@ -96,6 +105,34 @@ def main(args):
         ap = average_precision_score(labels, scores)
         print("AP:", ap)
 
+        # junk classifier
+        scores_junk = np.random.uniform(0,1,len(exp))
+        fpr, tpr, thres = roc_curve(labels, scores_junk)
+        roc_auc_junk = roc_auc_score(labels, scores_junk)
+        print("AUROC_baseline:", roc_auc_junk)
+        precision, recall, _ = precision_recall_curve(labels, scores_junk)
+        ap_junk = average_precision_score(labels, scores_junk)
+        print("AP_baseline:", ap_junk)
+
+        # corr
+        score_corr = corr_mat[ko_idx]
+        fpr, tpr, thres = roc_curve(labels, score_corr)
+        roc_auc_corr = roc_auc_score(labels, score_corr)
+        print("AUROC_corr:", roc_auc_corr)
+        precision, recall, _ = precision_recall_curve(labels, score_corr)
+        ap_corr = average_precision_score(labels, score_corr)
+        print("AP_corr:", ap_corr)
+
+        # GGM
+        scores_ggm = pre_[ko_idx]
+        fpr, tpr, thres = roc_curve(labels, scores_ggm)
+        roc_auc_ggm = roc_auc_score(labels, scores_ggm)
+        print("AUROC_ggm:", roc_auc_ggm)
+        precision, recall, _ = precision_recall_curve(labels, scores_ggm)
+        ap_ggm = average_precision_score(labels, scores_ggm)
+        print("AP_ggm:", ap_ggm)
+
+        # Knk
         exp.index = genes
         # sct = scTenifoldKnk(data=exp,
         #            ko_method="default",
@@ -131,10 +168,14 @@ def main(args):
             f = open(os.path.join("result", f'{args.out}.txt'), 'r')
         except IOError:
             f = open(os.path.join("result", f'{args.out}.txt'), 'w')
-            f.writelines("file,KO_gene,ROC,ROC_Knk,AP,AP_Knk\n")
+            f.writelines("file,file_id,KO_gene,ROC,ROC_Knk,ROC_junk,ROC_corr,ROC_ggm,"\
+            "AP,AP_Knk,AP_junk,AP_corr,AP_ggm\n")
         finally:  
             f = open(os.path.join("result", f'{args.out}.txt'), 'a')
-            f.writelines(f"{file}, {target_gene}, {roc_auc:.4f}, {roc_auc_knk:.4f}, {ap:.4f}, {ap_knk:.4f}\n")
+            f.writelines(f"{args.data},{args.data_id},{target_gene},"\
+            f"{roc_auc:.4f},{roc_auc_knk:.4f},{roc_auc_junk:.4f},{roc_auc_corr:.4f},{roc_auc_ggm:.4f},"\
+            f"{ap:.4f},{ap_knk:.4f},{ap_junk:.4f},{ap_corr:.4f},{ap_ggm:.4f}"\
+            "\n")
             f.close()
 
 
@@ -142,8 +183,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type = str, default = '100G_9T_300cPerT_4_DS1')
-    # parser.add_argument('-K', '--KO', type = str, default = 'g1')
-    parser.add_argument('-O', '--out', default = 'SERGIO')
+    parser.add_argument('--data_id', type = int, default = 0)
+    parser.add_argument('-O', '--out', default = 'SERGIO_trials')
     
     args = parser.parse_args()
     main(args)
