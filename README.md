@@ -24,7 +24,9 @@ cd GenKI
 pip install .
 ```
 <br/>
+
 or
+
 ```shell
 pip install git+https://github.com/yjgeno/GenKI.git
 ```
