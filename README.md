@@ -24,7 +24,6 @@ cd GenKI
 pip install .
 ```
 <br/>
-
 or
 
 ```shell
