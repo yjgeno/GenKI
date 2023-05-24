@@ -1,2 +1,2 @@
-from .dataloader import DataLoader
+from .dataLoader import DataLoader
 # from .train import VGAE_trainer
