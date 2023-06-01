@@ -135,4 +135,5 @@ BACKUP
 data*
 log_dir
 !notebook/*.py
-!notebook/example.ipynb
+!notebook/Example.ipynb
+!notebook/Compatible_matlab.ipynb

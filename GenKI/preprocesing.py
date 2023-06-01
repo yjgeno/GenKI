@@ -46,7 +46,7 @@ def _read_counts(counts_path: str,
             import h5py
             f = h5py.File(counts_path,'r')
             # print(f.keys())
-            counts = np.array(f.get(list(f.keys())[0]), dtype='float32')
+            counts = np.array(f.get(list(f.keys())[0]), dtype="float64")
             if transpose:
                 counts = counts.T
             adata = sc.AnnData(counts)
@@ -96,13 +96,17 @@ def build_adata(
     if meta_gene_path is not None and Path(meta_gene_path).is_file():
         try:
             # print("add metadata for genes")
-            adata.var_names = pd.read_csv(meta_gene_path, header=header, sep=sep)[0]
+            df_gene = pd.read_csv(meta_gene_path, header=header, sep=sep)
+            df_gene.index = df_gene.index.astype("str")
+            adata.var_names = df_gene[0]
         except Exception:
             raise ValueError("incorrect file path given to meta_gene")
     if meta_cell_path is not None and Path(meta_cell_path).is_file():
         try:
             # print("add metadata for cells")
-            adata.obs = pd.read_csv(meta_cell_path, header=header, sep=sep)
+            df_cell = pd.read_csv(meta_cell_path, header=header, sep=sep)
+            df_cell.index = df_cell.index.astype("str")
+            adata.obs = df_cell
             if meta_cell_cols is not None:
                 adata.obs.columns = meta_cell_cols
         except Exception:

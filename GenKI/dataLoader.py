@@ -24,6 +24,8 @@ class scBase():
 
         check_adata(adata)
         self._gene_names = list(adata.var_names)
+        if isinstance(target_gene[0], int): # list[int]
+            target_gene = adata.var_names[target_gene].tolist()
         if all([g not in self._gene_names for g in target_gene]):
             raise IndexError("The input target gene should be in the gene list of adata")
         else:
