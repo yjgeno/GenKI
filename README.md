@@ -1,5 +1,6 @@
 # GenKI (Gene Knock-out Inference)
 A VGAE (Variational Graph Auto-Encoder) based model to learn perturbation using scRNA-seq data. <br>
+<span style="color:red;">New!</span> Data has been added. <br>
 [Paper](https://doi.org/10.1093/nar/gkad450)
 <br/>
 <p align="center">
