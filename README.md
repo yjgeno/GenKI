@@ -8,26 +8,30 @@ A VGAE (Variational Graph Auto-Encoder) based model to learn perturbation using 
 </p>
 <br/>
 
-### Install dependencies
-Fist install dependencies of GenKI with `conda`:
-```shell
-conda env create -f environment.yml
-conda activate ogenki
-```
-Install `pytorch-geometric` following the document:<br>
-https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
-<br/>
-<br/>
+### Prerequisites
+Before installing GenKI, install [PyTorch](https://pytorch.org/get-started/locally/) and [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html) matching your CUDA version.
 
-### Install GenKI with `pip`:
+### Install GenKI with `pip` (PyPI):
+```shell
+pip install GenKI
+```
+
+Or install from source:
 ```shell
 pip install git+https://github.com/yjgeno/GenKI.git
 ```
-or install it manually from source:
+
+Or clone and install manually:
 ```shell
 git clone https://github.com/yjgeno/GenKI.git
 cd GenKI
 pip install .
+```
+
+Alternatively, use `conda` to set up the full environment:
+```shell
+conda env create -f environment.yml
+conda activate ogenki
 ```
 <br/>
 
