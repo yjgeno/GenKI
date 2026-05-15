@@ -8,17 +8,16 @@ PACKAGES = find_packages(exclude=("tests*",))
 exec(open('GenKI/version.py').read())
 
 INSTALL_REQUIRES = [
-        "anndata==0.8.0",
-        "matplotlib~=3.5.1",
+        "anndata>=0.8.0",
+        "matplotlib>=3.5.1",
         "numpy>=1.21.6",
-        "pandas~=1.4.2",
+        "pandas>=1.4.2",
         "ray>=1.11.0",
-        "scanpy==1.9.1",
-        "scipy~=1.8.0",
-        "statsmodels~=0.13.2",
+        "scanpy>=1.9.1",
+        "scipy>=1.8.0",
+        "statsmodels>=0.13.2",
         "scikit_learn>=1.0.2",
-        # "torch==1.11.0",
-        "tqdm~=4.64.0",
+        "tqdm>=4.64.0",
     ]
 
 setup(
@@ -38,13 +37,16 @@ setup(
         "computational-biology",
         "single-cell",
         "gene knock-out",
-        "gene regulatroy network",
+        "gene regulatory network",
     ],
     classifiers=[
     "License :: OSI Approved :: MIT License",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
     ],
     packages=PACKAGES,
     include_package_data=True, # MANIFEST
