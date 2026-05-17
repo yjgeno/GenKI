@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from .utils import get_distance
-from .preprocesing import split_data
+from .preprocessing import split_data
 
 
 class VariationalGCNEncoder(torch.nn.Module):  # encoder
@@ -193,8 +193,8 @@ class VGAE_trainer():
         """
         self.model.eval()
         _ = self.model.encode(data.x, data.edge_index) 
-        z_m = self.model.__mu__.detach().numpy()
-        z_S = (self.model.__logstd__.exp() ** 2).detach().numpy()  # variance
+        z_m = self.model.mu.detach().numpy()
+        z_S = (self.model.logstd.exp() ** 2).detach().numpy()  # variance
         if plot_latent_mu:
             # z_np = z.detach().numpy()
             fig, ax = plt.subplots(figsize=(6, 6), dpi=80)
@@ -252,7 +252,7 @@ class VGAE_trainer():
 
 
 def eva(args):
-    from .preprocesing import load_gdata
+    from .preprocessing import load_gdata
     CURRENT_DIR =  os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
     load_path = os.path.join(CURRENT_DIR, args.dir)
     data = load_gdata(load_path, "data")   

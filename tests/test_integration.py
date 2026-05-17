@@ -11,7 +11,7 @@ pytest.importorskip("torch")
 pytest.importorskip("torch_geometric")
 
 from GenKI.dataLoader import DataLoader
-from GenKI.preprocesing import build_adata
+from GenKI.preprocessing import build_adata
 from GenKI.train import VGAE_trainer
 from GenKI.utils import get_distance, get_generank
 
