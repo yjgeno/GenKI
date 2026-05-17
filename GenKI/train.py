@@ -31,7 +31,7 @@ class VGAE_trainer():
                  epochs: int = 100,
                  lr: float = 7e-4,
                  weight_decay = 9e-4,
-                 beta: str = 1e-4,
+                 beta: float = 1e-4,
                  log_dir: str = None, 
                  verbose: bool = True,            
                  seed: int = None,
@@ -308,7 +308,7 @@ def eva(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ddir', type = str, default = "data")
+    parser.add_argument('--dir', type = str, default = "data")
     parser.add_argument('--epochs', type = int, default = 100)
     parser.add_argument('--lr', type = float, default = 7e-4)
     parser.add_argument('--beta', type = float, default = 1e-4)

@@ -1,3 +1,12 @@
+"""Ray Tune hyperparameter search.
+
+QUARANTINED: this module targets the pre-Ray-2 Tune API (``tune.run``,
+``tune.report``, ``tune.checkpoint_dir``), removed in Ray >= 2.x. It will
+fail at call time on modern Ray and is intentionally not imported by the
+package. Porting to the Ray 2.x ``ray.train`` API is deferred to a later
+modernization stage. See tests/test_tune.py.
+"""
+
 import torch
 from .model import VGAE
 from .train import VariationalGCNEncoder
