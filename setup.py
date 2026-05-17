@@ -5,7 +5,10 @@ HERE = pathlib.Path(__file__).parent
 README = (HERE / "README.md").read_text()
 DESCRIPTION = "GenKI"
 PACKAGES = find_packages(exclude=("tests*",))
-exec(open('GenKI/version.py').read())
+_version: dict = {}
+with open(HERE / "GenKI" / "version.py") as _fp:
+    exec(_fp.read(), _version)
+__version__ = _version["__version__"]
 
 INSTALL_REQUIRES = [
         "anndata>=0.8.0",
