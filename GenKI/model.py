@@ -118,9 +118,9 @@ class VGAE(GAE):
             return mu
 
     def encode(self, *args, **kwargs):
-        self.__mu__, self.__logstd__ = self.encoder(*args, **kwargs)
-        self.__logstd__ = self.__logstd__.clamp(max=MAX_LOGSTD)
-        z = self.reparametrize(self.__mu__, self.__logstd__)
+        self.mu, self.logstd = self.encoder(*args, **kwargs)
+        self.logstd = self.logstd.clamp(max=MAX_LOGSTD)
+        z = self.reparametrize(self.mu, self.logstd)
         return z
 
     def kl_loss(self, mu=None, logstd=None):
@@ -135,8 +135,8 @@ class VGAE(GAE):
             :math:`\log\sigma`.  If set to :obj:`None`, uses the last
             computation of :math:`\log\sigma^2`.(default: :obj:`None`)
         """
-        mu = self.__mu__ if mu is None else mu
-        logstd = self.__logstd__ if logstd is None else logstd.clamp(
+        mu = self.mu if mu is None else mu
+        logstd = self.logstd if logstd is None else logstd.clamp(
             max=MAX_LOGSTD)
         return -0.5 * torch.mean(
             torch.sum(1 + 2 * logstd - mu**2 - logstd.exp()**2, dim=1))

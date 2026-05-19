@@ -26,7 +26,7 @@ from sklearn.covariance import GraphicalLasso, GraphicalLassoCV
 # linestyles = ['-', '--', '-.', ':', 'dashed', 'dashdot', 'dotted']
 
 import GenKI as gk
-from GenKI.preprocesing import build_adata
+from GenKI.preprocessing import build_adata
 from GenKI.train import VGAE_trainer
 from GenKI import utils
 from scTenifold import scTenifoldKnk

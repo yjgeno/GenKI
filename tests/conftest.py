@@ -4,9 +4,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-# anndata>=0.10 emits FutureWarnings for the top-level read_* names that
-# GenKI.preprocesing still imports. They are non-fatal; silence so the
-# behavioural assertions are not masked by warning noise.
+# The bundled sample .h5ad triggers anndata OldFormatWarning/FutureWarning
+# noise on read. It is non-fatal; silence so behavioural assertions are
+# not masked.
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "microglial_seurat_WT.h5ad"

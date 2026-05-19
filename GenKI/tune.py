@@ -14,7 +14,7 @@ import numpy as np
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 import os
-from .preprocesing import split_data
+from .preprocessing import split_data
 
 
 hyperparams = {
