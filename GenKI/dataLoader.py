@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 # from tqdm import tqdm
 from .pcNet import make_pcNet
-from .preprocesing import check_adata
+from .preprocessing import check_adata
 
 
 class scBase():
@@ -55,8 +55,11 @@ class scBase():
                 if verbose:
                     print(f"loading GRN from \"{pcNet_path}\"")
                 self._net = scipy.sparse.load_npz(pcNet_path)
-            except ImportError:
-                print("require npz file name")
+            except (FileNotFoundError, OSError) as e:
+                raise FileNotFoundError(
+                    f"no prebuilt GRN at \"{pcNet_path}\"; pass rebuild_GRN=True "
+                    f"to build it, or point GRN_file_dir/pcNet_name at an existing .npz"
+                ) from e
         if verbose:
             print("init completed\n")  
 

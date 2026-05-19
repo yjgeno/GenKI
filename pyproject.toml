@@ -1,3 +1,68 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "GenKI"
+description = "Gene knock-out inference from single-cell data with variational graph autoencoders"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Yongjian Yang, TAMU", email = "yjyang027@tamu.edu" }]
+keywords = [
+    "neural network",
+    "graph neural network",
+    "variational graph neural network",
+    "computational-biology",
+    "single-cell",
+    "gene knock-out",
+    "gene regulatory network",
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dynamic = ["version"]
+dependencies = [
+    "anndata>=0.9",
+    "h5py>=3.7",
+    "matplotlib>=3.6",
+    "numpy>=1.23",
+    "pandas>=1.5",
+    "scanpy>=1.9",
+    "scikit-learn>=1.1",
+    "scipy>=1.9",
+    "statsmodels>=0.13",
+    "tensorboard>=2.10",
+    "torch>=1.13",
+    "torch-geometric>=2.3",
+    "tqdm>=4.64",
+]
+
+[project.optional-dependencies]
+ray = ["ray>=2.0"]
+dev = ["build", "pytest>=7.0", "ruff", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/yjgeno/GenKI"
+Repository = "https://github.com/yjgeno/GenKI"
+
+[tool.setuptools.dynamic]
+version = { attr = "GenKI.version.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["GenKI*"]
+exclude = ["tests*", "notebook*"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::FutureWarning", "ignore::DeprecationWarning"]
