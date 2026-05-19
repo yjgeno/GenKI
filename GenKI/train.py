@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import logging
 from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
 from .model import VGAE
@@ -10,6 +11,8 @@ from tqdm import tqdm
 
 from .utils import get_distance
 from .preprocessing import split_data
+
+logger = logging.getLogger(__name__)
 
 
 class VariationalGCNEncoder(torch.nn.Module):  # encoder
@@ -76,13 +79,13 @@ class VGAE_trainer():
         if x_dropout is not None:
             mask = torch.FloatTensor(self.data.x.shape).uniform_() > x_dropout # % zeros
             self.data.x = self.data.x * mask
-            print(f"force zeros to data x, dropout: {x_dropout}")
+            logger.debug("force zeros to data x, dropout: %s", x_dropout)
 
         self.train_data, self.val_data, self.test_data = split_data(data = self.data, **kwargs) # fixed split
         if x_noise is not None: # white noise on X
             gamma = x_noise * torch.randn(self.train_data.x.shape)
             self.train_data.x = 2**gamma * self.train_data.x
-            print(f"add white noise to training data x, level: {x_noise} SD")
+            logger.debug("add white noise to training data x, level: %s SD", x_noise)
         
         # if x_dropout is not None:
         #     mask = torch.FloatTensor(self.train_data.x.shape).uniform_() > x_dropout # % zeros
@@ -92,8 +95,7 @@ class VGAE_trainer():
         if edge_noise is not None:
             n_pos_edge = self.train_data.pos_edge_label_index.shape[1]
             n = int(abs(edge_noise) * n_pos_edge)
-            print("Before:", self.train_data)
-            print("\n")
+            logger.debug("Before: %s", self.train_data)
             if edge_noise > 0: # fold edges
                 from torch_geometric.utils import negative_sampling
                 fake_pos_edge = negative_sampling(self.data.edge_index,  # then fake edges impossible appeared in test set: for data leakage
@@ -101,7 +103,7 @@ class VGAE_trainer():
                                                     num_nodes = len(self.train_data.x))
                 new_pos_edge = torch.unique(torch.cat((self.train_data.pos_edge_label_index, fake_pos_edge), 1), dim = 1) 
                 new_edge = torch.cat((new_pos_edge, new_pos_edge[torch.LongTensor([1, 0])]), 1) # swap           
-                print(f"add noise to training data edge, level: {edge_noise}: add {n} edges")      
+                logger.debug("add noise to training data edge, level: %s: add %d edges", edge_noise, n)
             else: # ratio edges
                 if n > n_pos_edge:
                     raise ValueError("cannot retain edges more than the total")
@@ -111,9 +113,9 @@ class VGAE_trainer():
                 new_edge = torch.cat((new_pos_edge, new_pos_edge[torch.LongTensor([1, 0])]), 1)
                 # new_neg_edge = self.train_data.neg_edge_label_index[:, index]
                 # self.train_data.neg_edge_label_index = new_neg_edge
-                print(f"retain a portion of training data edge, level: {abs(edge_noise)}: retain {n} edges")   
+                logger.debug("retain a portion of training data edge, level: %s: retain %d edges", abs(edge_noise), n)
             self.train_data.edge_index, self.train_data.pos_edge_label_index = new_edge, new_pos_edge
-            print("After:", self.train_data)
+            logger.debug("After: %s", self.train_data)
 
 
     # refer to https://github.com/pyg-team/pytorch_geometric/blob/master/examples/autoencoder.py
@@ -155,7 +157,7 @@ class VGAE_trainer():
                     self.test_logger.add_scalar("AUROC", auc, global_step)
                     self.test_logger.add_scalar("AP", ap, global_step)
                 if self.verbose:
-                    print(f"Epoch: {epoch:03d}, Loss: {loss:.4f}, AUROC: {auc:.4f}, AP: {ap:.4f}")
+                    logger.debug("Epoch: %03d, Loss: %.4f, AUROC: %.4f, AP: %.4f", epoch, loss, auc, ap)
         self.final_metrics = global_step, loss.item(), auc, ap
 
 
@@ -166,7 +168,7 @@ class VGAE_trainer():
         if isinstance(self.model, VGAE):
             os.makedirs("model", exist_ok=True)
             path = os.path.join("model", f"{name}.th")
-            print(f"save model parameters to {path}")
+            logger.info("save model parameters to %s", path)
             return torch.save(self.model.state_dict(), f"model/{name}.th")
         else:
             raise ValueError(f"model type {type(self.model)} not supported")
@@ -178,7 +180,7 @@ class VGAE_trainer():
         """
         r = VGAE(VariationalGCNEncoder(self.num_features, self.out_channels))
         path = os.path.join("model", f"{name}.th")
-        print(f"load model parameters from {path}")
+        logger.info("load model parameters from %s", path)
         r.load_state_dict(
             torch.load(os.path.join("model", f"{name}.th"), map_location=torch.device("cpu"))
         )
@@ -285,7 +287,7 @@ def eva(args):
         f.close()
     if args.do_test:
         data_ko = load_gdata(load_path, "data_ko")
-        print("continue")
+        logger.debug("continue")
         from .utils import get_generank, get_r2_score
         z_mu, z_std = sensei.get_latent_vars(data)
         z_mu_KO, z_std_KO = sensei.get_latent_vars(data_ko)

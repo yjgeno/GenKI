@@ -8,11 +8,14 @@ modernization stage. See tests/test_tune.py.
 """
 
 import torch
+import logging
 from .model import VGAE
 from .train import VariationalGCNEncoder
 import numpy as np
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
+
+logger = logging.getLogger(__name__)
 import os
 from .preprocessing import split_data
 
@@ -67,7 +70,7 @@ def train(config, checkpoint_dir = None):
                 (model.state_dict(), optimizer.state_dict()), path)
         # record metrics from valid set
         tune.report(Loss = loss.item(), AUROC = auc, AP = ap, F_ = auc*ap) # call: shown as training_iteration
-    print("Finished Training")
+    logger.info("Finished Training")
 
 
 def test_best_model(best_trial):
@@ -87,8 +90,8 @@ def test_best_model(best_trial):
         best_trained_model.eval()
         z = best_trained_model.encode(test_data.x, test_data.edge_index)
         auc, ap = best_trained_model.test(z, test_data.pos_edge_label_index, test_data.neg_edge_label_index)
-    print(f"Best trial test AUROC: {auc:.4f}")
-    print(f"Best trial test AP: {ap:.4f}")
+    logger.info("Best trial test AUROC: %.4f", auc)
+    logger.info("Best trial test AP: %.4f", ap)
 
 
 def main(num_samples, 
@@ -110,9 +113,9 @@ def main(num_samples,
                     #   stop = {'training_iteration':100}, # when tune.report was called
                       )
     best_trial = result.get_best_trial("F_", "max", "last")
-    print(f"Best trial config: {best_trial}")
-    print("Best trial valid AUROC: {}".format(best_trial.last_result["AUROC"]))
-    print("Best trial valid AP: {}".format(best_trial.last_result["AP"]))
+    logger.info("Best trial config: %s", best_trial)
+    logger.info("Best trial valid AUROC: %s", best_trial.last_result["AUROC"])
+    logger.info("Best trial valid AP: %s", best_trial.last_result["AP"])
     test_best_model(best_trial) # only should run once
     save_path = os.path.join(os.path.dirname(os.path.abspath(os.path.dirname(__file__))), f"{save_as}.csv")
     result.dataframe().to_csv(save_path)

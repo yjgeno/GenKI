@@ -1,10 +1,13 @@
 import os
 import time
+import logging
 import numpy as np
 from numpy.linalg import svd as _full_svd
 from scipy import sparse
 from scipy.sparse.linalg import svds as _scipy_svds
 from sklearn.utils.extmath import randomized_svd as _randomized_svd
+
+logger = logging.getLogger(__name__)
 
 try:
     import ray
@@ -264,7 +267,7 @@ def make_pcNet(X,
 
     use_ray = n_cpus != 1 and _HAS_RAY
     if n_cpus != 1 and not _HAS_RAY:
-        print("ray not installed; falling back to single-process build")
+        logger.warning("ray not installed; falling back to single-process build")
 
     if solver == "shared":
         # Shared-SVD path: a single sketched range-finder is reused across all
@@ -278,7 +281,7 @@ def make_pcNet(X,
         owns_ray = not ray.is_initialized()
         if owns_ray:
             ray.init(num_cpus=n_cpus, ignore_reinit_error=True, log_to_driver=False)
-            print(f"ray init, using {n_cpus} CPUs")
+            logger.info("ray init, using %d CPUs", n_cpus)
 
         np.random.seed(random_state)
         chunks = _split_indices(n, n_cpus)
@@ -300,7 +303,7 @@ def make_pcNet(X,
     net = _assemble_A(B, n, scale, symmetric, q, as_sparse)
     if timeit:
         duration = time.time() - start_time
-        print("execution time of making pcNet: {:.2f} s (solver={})".format(duration, solver))
+        logger.info("execution time of making pcNet: %.2f s (solver=%s)", duration, solver)
     return net
 
 
@@ -318,7 +321,7 @@ else:
 def main():
     counts = np.random.randint(0, 10, (5, 100))
     net = make_pcNet(counts, as_sparse=True, timeit=True, n_cpus=1)
-    print(f"input counts shape: {counts.shape},\nmake pcNet completed, shape: {net.shape}")
+    logger.info("input counts shape: %s, make pcNet completed, shape: %s", counts.shape, net.shape)
     return 100
 
 

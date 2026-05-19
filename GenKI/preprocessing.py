@@ -4,12 +4,15 @@ import scanpy as sc
 import pandas as pd
 from typing import Union
 from scipy import sparse
-import os 
+import os
 import pickle
+import logging
 from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric import seed_everything
 sc.settings.verbosity = 0
+
+logger = logging.getLogger(__name__)
 
 CURRENT_DIR =  os.path.dirname(os.path.abspath(os.path.dirname(__file__))) # GenKI
 # https://scanpy.readthedocs.io/en/stable/api.html#reading
@@ -31,7 +34,7 @@ def _read_counts(counts_path: str,
 
     file_attr = counts_path.split(".")[-1]
     if Path(counts_path).is_file() and file_attr in file_attrs:
-        print(f"load counts from {counts_path}")
+        logger.info("load counts from %s", counts_path)
         if file_attr == "mat":
             import numpy as np
             import h5py
@@ -140,7 +143,7 @@ def check_adata(adata):
 def save_gdata(data, dir: str = "data", name: str = "data"):
     path = os.path.join(CURRENT_DIR, dir)
     os.makedirs(path, exist_ok = True)
-    print(f"save {name} to dir {path}")
+    logger.info("save %s to dir %s", name, path)
     with open(os.path.join(path, f'{name}.p'), 'wb') as f:
         pickle.dump(data.to_dict(), f, protocol=pickle.HIGHEST_PROTOCOL)
     
@@ -149,7 +152,7 @@ def load_gdata(dir: str = "data", name: str = "data"):
     with open(os.path.join(dir, f"{name}.p"), 'rb') as f:
         data = pickle.load(f)
     data = Data.from_dict(data)
-    print(f"load {name} from dir {dir}")
+    logger.info("load %s from dir %s", name, dir)
     return data
 
 
@@ -186,4 +189,4 @@ if __name__ == "__main__":
     gene_path = str(path.join(data_dir, "genes.tsv"))
     cell_path = str(path.join(data_dir, "barcodes.tsv"))
     adata = build_adata(counts_path, gene_path, cell_path)
-    print(adata)
+    logger.info("%s", adata)

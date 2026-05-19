@@ -4,12 +4,15 @@ import anndata
 import os
 import hashlib
 import json
+import logging
 import torch
 from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 # from tqdm import tqdm
 from .pcNet import make_pcNet
 from .preprocessing import check_adata
+
+logger = logging.getLogger(__name__)
 
 
 def _hash_grn_inputs(matrix, params: dict) -> str:
@@ -52,7 +55,7 @@ class scBase():
         if target_cell is None:
             self._counts = adata.X # use all cells, standardized counts
             if verbose:
-                print(f"use all the cells ({self._counts.shape[0]}) in adata")
+                logger.debug("use all the cells (%d) in adata", self._counts.shape[0])
         elif not (obs_label in adata.obs.keys()):
             raise IndexError("require a valid cell label in adata.obs")
         else:
@@ -69,23 +72,23 @@ class scBase():
         loaded_from_cache = False
         if use_cache and cache_path is not None and os.path.exists(cache_path):
             if verbose:
-                print(f"loading GRN from cache \"{cache_path}\"")
+                logger.debug("loading GRN from cache \"%s\"", cache_path)
             self._net = scipy.sparse.load_npz(cache_path)
             loaded_from_cache = True
         elif rebuild_GRN:
             if verbose:
-                print("build GRN")
+                logger.debug("build GRN")
             self._net = make_pcNet(adata.layers["norm"], nComp=5, as_sparse=True, timeit=verbose, **kwargs)
             os.makedirs(GRN_file_dir, exist_ok=True)
             scipy.sparse.save_npz(legacy_path, self._net)
             if cache_path is not None:
                 scipy.sparse.save_npz(cache_path, self._net)
             if verbose:
-                print(f"GRN has been built and saved in \"{legacy_path}\"")
+                logger.debug("GRN has been built and saved in \"%s\"", legacy_path)
         else:
             try:
                 if verbose:
-                    print(f"loading GRN from \"{legacy_path}\"")
+                    logger.debug("loading GRN from \"%s\"", legacy_path)
                 self._net = scipy.sparse.load_npz(legacy_path)
             except (FileNotFoundError, OSError) as e:
                 raise FileNotFoundError(
@@ -94,8 +97,8 @@ class scBase():
                 ) from e
         if verbose:
             if loaded_from_cache:
-                print("(GRN build skipped — cache hit)")
-            print("init completed\n")
+                logger.debug("GRN build skipped — cache hit")
+            logger.debug("init completed")
 
     @property
     def counts(self):
@@ -230,7 +233,7 @@ class DataLoader(scBase):
                 ax[i].legend()
             plt.show()
         if self.verbose:
-            print(f"sample gene patterns ({self._counts.shape[0]}) from NB{n_NB, p_NB} with P(zero) = {round(1-p_BIN, 2)}")
+            logger.debug("sample gene patterns (%d) from NB%s with P(zero) = %.2f", self._counts.shape[0], (n_NB, p_NB), round(1 - p_BIN, 2))
         return s
     
 
@@ -265,7 +268,7 @@ class DataLoader(scBase):
         counts_OE = counts_OE.toarray() if scipy.sparse.issparse(counts_OE) else counts_OE
         x_OE = torch.tensor(counts_OE.T, dtype = torch.float) 
         if self.verbose:
-            print(f"replace expression of {self._target_gene} to simulated expressions and edges by scale {weight_scale}")
+            logger.debug("replace expression of %s to simulated expressions and edges by scale %s", self._target_gene, weight_scale)
         return Data(x = x_OE, edge_index = edge_index_OE, y = self._gene_names)
 
 

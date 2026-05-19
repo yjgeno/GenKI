@@ -2,11 +2,14 @@ import numpy as np
 import pandas as pd
 import os
 import scipy
+import logging
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.vq import kmeans2
 import math
+
+logger = logging.getLogger(__name__)
 
 
 def boxcox_norm(x):
@@ -136,7 +139,7 @@ def get_generank(
             np.savetxt(
                 os.path.join("result", f"{save_significant_as}.txt"), output, fmt="%s", delimiter=","
             )
-            print(f"save {len(output)} genes to \"./result/{save_significant_as}.txt\"")
+            logger.info("save %d genes to \"./result/%s.txt\"", len(output), save_significant_as)
     else:
         df_KL = pd.DataFrame(
             data=distance, index=np.array(data.y), columns=["dis"]
@@ -173,7 +176,7 @@ def get_generank_gsea(data,
         np.savetxt(
             os.path.join("result", "GSEA_{save_as}.txt"), output_gsea, fmt="%s", delimiter="\t"
         )
-        print(f"save ranked genes to \"./result/GSEA_{save_as}.txt\"")
+        logger.info("save ranked genes to \"./result/GSEA_%s.txt\"", save_as)
     return df_gsea
 
 
@@ -228,8 +231,9 @@ def get_sys_KO_cluster(
     cluster_idx = np.where(label == label[obj(obj._target_gene)])
     cluster_gene_names = np.array(obj._gene_names)[cluster_idx]
     if verbose:
-        print(
-            f"TSNE perplexity: {perplexity}, # Clustering: {n_cluster}\nThe cluster containing {obj._target_gene} has {len(cluster_gene_names)} genes"
+        logger.debug(
+            "TSNE perplexity: %d, # Clustering: %d\nThe cluster containing %s has %d genes",
+            perplexity, n_cluster, obj._target_gene, len(cluster_gene_names),
         )
     if save_as is not None:
         os.makedirs("result", exist_ok=True)
@@ -239,7 +243,7 @@ def get_sys_KO_cluster(
             fmt="%s",
             delimiter="\t",
         )
-        print(f"save ranked genes to \"./result/sys_KO_{save_as}.txt\"")
+        logger.info("save ranked genes to \"./result/sys_KO_%s.txt\"", save_as)
     if show_TSNE:
         fig, ax = plt.subplots(figsize=(8, 8), dpi=80)
         colors = [
