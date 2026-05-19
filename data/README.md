@@ -1,2 +1,1 @@
-* The microglial (Trem2-KO) dataset is now available at [GoogleDrive](https://drive.google.com/file/d/1tG9bUGCsWqhg0hJ94lDLtLl8WLl0hDks/view?usp=sharing). 
-* Other datasets may be provided upon request.
+The microglial (wild-type) scRNA-seq dataset used in the GenKI paper is included here as `microglial_seurat_WT.h5ad`. Use it directly with any of the Quick Start examples in the main README — no additional downloads required.
