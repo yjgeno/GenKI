@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from .utils import get_distance
-from .preprocesing import split_data
+from .preprocessing import split_data
 
 
 class VariationalGCNEncoder(torch.nn.Module):  # encoder
@@ -31,7 +31,7 @@ class VGAE_trainer():
                  epochs: int = 100,
                  lr: float = 7e-4,
                  weight_decay = 9e-4,
-                 beta: str = 1e-4,
+                 beta: float = 1e-4,
                  log_dir: str = None, 
                  verbose: bool = True,            
                  seed: int = None,
@@ -193,8 +193,8 @@ class VGAE_trainer():
         """
         self.model.eval()
         _ = self.model.encode(data.x, data.edge_index) 
-        z_m = self.model.__mu__.detach().numpy()
-        z_S = (self.model.__logstd__.exp() ** 2).detach().numpy()  # variance
+        z_m = self.model.mu.detach().numpy()
+        z_S = (self.model.logstd.exp() ** 2).detach().numpy()  # variance
         if plot_latent_mu:
             # z_np = z.detach().numpy()
             fig, ax = plt.subplots(figsize=(6, 6), dpi=80)
@@ -252,7 +252,7 @@ class VGAE_trainer():
 
 
 def eva(args):
-    from .preprocesing import load_gdata
+    from .preprocessing import load_gdata
     CURRENT_DIR =  os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
     load_path = os.path.join(CURRENT_DIR, args.dir)
     data = load_gdata(load_path, "data")   
@@ -308,7 +308,7 @@ def eva(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ddir', type = str, default = "data")
+    parser.add_argument('--dir', type = str, default = "data")
     parser.add_argument('--epochs', type = int, default = 100)
     parser.add_argument('--lr', type = float, default = 7e-4)
     parser.add_argument('--beta', type = float, default = 1e-4)

@@ -12,7 +12,7 @@ A Variational Graph Auto-Encoder (VGAE) model for predicting gene perturbation e
 
 ## Prerequisites
 
-GenKI requires **PyTorch** and **PyTorch Geometric**, which must be installed separately to match your CUDA version:
+GenKI requires **Python ≥ 3.10**. **PyTorch** and **PyTorch Geometric** are installed automatically (CPU builds) with the package. For a GPU/CUDA build, install them first to match your CUDA version:
 
 1. [Install PyTorch](https://pytorch.org/get-started/locally/)
 2. [Install PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
@@ -38,9 +38,47 @@ conda activate ogenki
 
 ## Quick Start
 
+The high-level `GenKI` facade runs the whole workflow — load & preprocess data, build the GRN, train the VGAE, and rank genes — in one call:
+
+```python
+from GenKI import GenKI
+
+ranked = GenKI.from_h5ad(
+    "data/my_data.h5ad",
+    target_gene=["TUBG1"],   # gene(s) to knock out (upper-cased by default)
+).run(epochs=100, seed=8096, n_permutations=100)
+
+print(ranked)   # genes ranked by perturbation effect
+```
+
+Separate the training and prediction steps when you want to inspect the model in between:
+
+```python
+gk = GenKI.from_h5ad("data/my_data.h5ad", target_gene=["TUBG1"])
+gk.fit(epochs=100, lr=7e-4, beta=1e-4, seed=8096)
+ranked = gk.predict(n_permutations=100, by="KL")
+
+print(gk.metrics)        # (epochs, loss, AUROC, AP)
+gk.loader, gk.trainer    # escape hatch to the underlying objects
+```
+
+Start from an in-memory `AnnData` instead of a file (set `preprocess=True` to normalize/standardize it):
+
 ```python
 import scanpy as sc
-from GenKI.preprocesing import build_adata
+
+adata = sc.read_h5ad("data/my_data.h5ad")
+gk = GenKI.from_adata(adata, target_gene=["TUBG1"], preprocess=True)
+ranked = gk.run(seed=8096)
+```
+
+Building the GRN in parallel needs the optional Ray extra (`pip install "GenKI[ray]"`); pass `n_cpus` and other GRN options as keyword arguments, e.g. `GenKI.from_h5ad(..., rebuild_grn=True, n_cpus=8)`.
+
+<details>
+<summary><b>Lower-level API</b> (fine-grained control over each step)</summary>
+
+```python
+from GenKI.preprocessing import build_adata
 from GenKI.dataLoader import DataLoader
 from GenKI.train import VGAE_trainer
 from GenKI import utils
@@ -77,16 +115,19 @@ res = utils.get_generank(data_wt, dis, null)
 print(res)
 ```
 
+</details>
+
 ## API
 
 | Symbol | Description |
 |---|---|
+| `GenKI.GenKI` | High-level facade: `from_h5ad` / `from_adata` constructors and `fit` / `predict` / `run` methods covering the full workflow |
 | `GenKI.dataLoader.DataLoader` | Wraps an `AnnData` object, builds/loads the GRN, and produces PyG `Data` objects for WT and virtual-KO conditions |
 | `GenKI.train.VGAE_trainer` | Trains the VGAE, exposes latent variables, permutation testing, and model save/load |
 | `GenKI.utils.get_distance` | Computes per-gene distribution distance (KL, EMD, t-test) between two latent spaces |
 | `GenKI.utils.get_generank` | Ranks genes by perturbation score; optionally filters by permutation-test significance |
-| `GenKI.preprocesing.build_adata` | Loads an `.h5ad` file and adds a log-normalised layer used by `DataLoader` |
-| `GenKI.pcNet.make_pcNet` | Builds a principal-component-based GRN from expression data (parallelised with Ray) |
+| `GenKI.preprocessing.build_adata` | Loads an `.h5ad` file and adds a log-normalised layer used by `DataLoader` |
+| `GenKI.pcNet.make_pcNet` | Builds a principal-component-based GRN from expression data (optionally parallelised with Ray) |
 
 ## Tutorial
 
