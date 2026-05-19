@@ -1,6 +1,6 @@
 # GenKI — Gene Knock-out Inference
 
-[![PyPI version](https://img.shields.io/pypi/v/genki.svg)](https://pypi.org/project/genki/)
+[![PyPI version](https://img.shields.io/pypi/v/GenKI.svg)](https://pypi.org/project/GenKI/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![DOI](https://img.shields.io/badge/DOI-10.1093%2Fnar%2Fgkad450-blue)](https://doi.org/10.1093/nar/gkad450)
 
