@@ -56,3 +56,37 @@ def test_full_workflow(small_adata, tmp_path):
     assert len(df) == n_genes
     assert "rank" in df.columns
     assert list(df["rank"]) == list(range(1, n_genes + 1))
+
+
+def test_grn_cache_roundtrip(small_adata, tmp_path):
+    """Building twice with the same inputs hits the on-disk cache the second
+    time and produces an identical GRN — no rebuild needed."""
+    import time
+    import os
+    adata = build_adata(small_adata, log_normalize=False, scale_data=True)
+    target_gene = [adata.var_names[0]]
+    grn_dir = str(tmp_path / "GRNs")
+
+    t0 = time.time()
+    first = DataLoader(
+        adata, target_gene=target_gene, rebuild_GRN=True,
+        GRN_file_dir=grn_dir, pcNet_name="pcNet", verbose=False,
+    )
+    t_first = time.time() - t0
+
+    # Cache file written with hash suffix; legacy file also written for
+    # backwards compatibility.
+    cached = [f for f in os.listdir(grn_dir) if f.startswith("pcNet.") and f.endswith(".npz")]
+    assert any(f == "pcNet.npz" for f in cached)
+    assert any(f != "pcNet.npz" for f in cached), "expected a hashed cache file"
+
+    t0 = time.time()
+    second = DataLoader(
+        adata, target_gene=target_gene, rebuild_GRN=False,
+        GRN_file_dir=grn_dir, pcNet_name="pcNet", verbose=False,
+    )
+    t_second = time.time() - t0
+
+    assert (first.net != second.net).nnz == 0, "cached GRN must match the freshly built one"
+    # A real cache hit should be at least ~5x faster than the original build.
+    assert t_second < t_first / 2, f"cache hit not faster: {t_first:.3f}s vs {t_second:.3f}s"

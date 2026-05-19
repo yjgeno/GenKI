@@ -2,25 +2,44 @@ import numpy as np
 import scipy
 import anndata
 import os
-import torch 
-from torch_geometric.data import Data 
+import hashlib
+import json
+import torch
+from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 # from tqdm import tqdm
 from .pcNet import make_pcNet
 from .preprocessing import check_adata
 
 
+def _hash_grn_inputs(matrix, params: dict) -> str:
+    """Hash that uniquely identifies (matrix, build params) for GRN caching."""
+    h = hashlib.sha256()
+    h.update(str(matrix.shape).encode())
+    h.update(str(matrix.dtype).encode())
+    if scipy.sparse.issparse(matrix):
+        m = matrix.tocsr()
+        h.update(m.data.tobytes())
+        h.update(m.indices.tobytes())
+        h.update(m.indptr.tobytes())
+    else:
+        h.update(np.ascontiguousarray(matrix).tobytes())
+    h.update(json.dumps(params, sort_keys=True, default=str).encode())
+    return h.hexdigest()
+
+
 class scBase():
-    def __init__(self, 
-            adata: anndata.AnnData, 
-            target_gene: list[str], 
-            target_cell: str = None, 
+    def __init__(self,
+            adata: anndata.AnnData,
+            target_gene: list[str],
+            target_cell: str = None,
             obs_label: str = "ident",
             GRN_file_dir: str = "GRNs",
-            rebuild_GRN: bool = False, 
-            pcNet_name: str = "pcNet", 
+            rebuild_GRN: bool = False,
+            pcNet_name: str = "pcNet",
+            use_cache: bool = True,
             verbose: bool = False,
-            **kwargs): 
+            **kwargs):
 
         check_adata(adata)
         self._gene_names = list(adata.var_names)
@@ -30,7 +49,6 @@ class scBase():
             raise IndexError("The input target gene should be in the gene list of adata")
         else:
             self._target_gene = target_gene
-            # self._idx_KO = self._gene_names.index(target_gene)
         if target_cell is None:
             self._counts = adata.X # use all cells, standardized counts
             if verbose:
@@ -38,30 +56,46 @@ class scBase():
         elif not (obs_label in adata.obs.keys()):
             raise IndexError("require a valid cell label in adata.obs")
         else:
-            self._counts = adata[adata.obs[obs_label] == target_cell, :].X 
-        self._counts = scipy.sparse.lil_matrix(self._counts) # sparse 
-        pcNet_path = os.path.join(GRN_file_dir, f"{pcNet_name}.npz")
-        if rebuild_GRN: 
+            self._counts = adata[adata.obs[obs_label] == target_cell, :].X
+        self._counts = scipy.sparse.lil_matrix(self._counts) # sparse
+
+        legacy_path = os.path.join(GRN_file_dir, f"{pcNet_name}.npz")
+        cache_path = None
+        if use_cache:
+            grn_inputs = adata.layers["norm"]
+            cache_key = _hash_grn_inputs(grn_inputs, {"nComp": 5, **kwargs})
+            cache_path = os.path.join(GRN_file_dir, f"{pcNet_name}.{cache_key[:12]}.npz")
+
+        loaded_from_cache = False
+        if use_cache and cache_path is not None and os.path.exists(cache_path):
+            if verbose:
+                print(f"loading GRN from cache \"{cache_path}\"")
+            self._net = scipy.sparse.load_npz(cache_path)
+            loaded_from_cache = True
+        elif rebuild_GRN:
             if verbose:
                 print("build GRN")
-            self._net = make_pcNet(adata.layers["norm"], nComp = 5, as_sparse = True, timeit = verbose, **kwargs)           
-            os.makedirs(GRN_file_dir, exist_ok = True) # create dir 
-            scipy.sparse.save_npz(pcNet_path, self._net) # save GRN
-            # scipy.sparse.lil_matrix(pcNet_np) # np to sparse
+            self._net = make_pcNet(adata.layers["norm"], nComp=5, as_sparse=True, timeit=verbose, **kwargs)
+            os.makedirs(GRN_file_dir, exist_ok=True)
+            scipy.sparse.save_npz(legacy_path, self._net)
+            if cache_path is not None:
+                scipy.sparse.save_npz(cache_path, self._net)
             if verbose:
-                print(f"GRN has been built and saved in \"{pcNet_path}\"")
+                print(f"GRN has been built and saved in \"{legacy_path}\"")
         else:
             try:
                 if verbose:
-                    print(f"loading GRN from \"{pcNet_path}\"")
-                self._net = scipy.sparse.load_npz(pcNet_path)
+                    print(f"loading GRN from \"{legacy_path}\"")
+                self._net = scipy.sparse.load_npz(legacy_path)
             except (FileNotFoundError, OSError) as e:
                 raise FileNotFoundError(
-                    f"no prebuilt GRN at \"{pcNet_path}\"; pass rebuild_GRN=True "
+                    f"no prebuilt GRN at \"{legacy_path}\"; pass rebuild_GRN=True "
                     f"to build it, or point GRN_file_dir/pcNet_name at an existing .npz"
                 ) from e
         if verbose:
-            print("init completed\n")  
+            if loaded_from_cache:
+                print("(GRN build skipped — cache hit)")
+            print("init completed\n")
 
     @property
     def counts(self):
@@ -92,25 +126,27 @@ class scBase():
 
 
 class DataLoader(scBase):
-    def __init__(self, 
-            adata: anndata.AnnData, 
-            target_gene: list[str], 
-            target_cell: str = None, 
+    def __init__(self,
+            adata: anndata.AnnData,
+            target_gene: list[str],
+            target_cell: str = None,
             obs_label: str = "ident",
             GRN_file_dir: str = "GRNs",
-            rebuild_GRN: bool = False, 
-            pcNet_name: str = "pcNet", 
+            rebuild_GRN: bool = False,
+            pcNet_name: str = "pcNet",
             cutoff: int = 85,
+            use_cache: bool = True,
             verbose: bool = False,
             **kwargs):
-        super().__init__(adata, 
-                         target_gene, 
-                         target_cell, 
-                         obs_label, 
-                         GRN_file_dir, 
-                         rebuild_GRN, 
-                         pcNet_name, 
-                         verbose, 
+        super().__init__(adata,
+                         target_gene,
+                         target_cell,
+                         obs_label,
+                         GRN_file_dir,
+                         rebuild_GRN,
+                         pcNet_name,
+                         use_cache,
+                         verbose,
                          **kwargs)
         self.verbose = verbose
         self.cutoff = cutoff
