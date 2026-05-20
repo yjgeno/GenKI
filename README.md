@@ -97,9 +97,6 @@ data_wrapper = DataLoader(
     target_gene=["TUBG1"],   # gene to knock out
     target_cell=None,         # None = use all cells
     GRN_file_dir="GRNs",
-    rebuild_GRN=True,
-    pcNet_name="pcNet",
-    verbose=True,
     n_cpus=8,
 )
 data_wt = data_wrapper.load_data()

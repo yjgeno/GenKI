@@ -25,10 +25,7 @@ def test_full_workflow(small_adata, tmp_path):
     loader = DataLoader(
         adata,
         target_gene=target_gene,
-        rebuild_GRN=True,
         GRN_file_dir=str(tmp_path / "GRNs"),
-        pcNet_name="pcNet",
-        verbose=False,
     )
     n_genes = adata.n_vars
     assert loader.net.shape == (n_genes, n_genes)
@@ -69,21 +66,18 @@ def test_grn_cache_roundtrip(small_adata, tmp_path):
 
     t0 = time.time()
     first = DataLoader(
-        adata, target_gene=target_gene, rebuild_GRN=True,
-        GRN_file_dir=grn_dir, pcNet_name="pcNet", verbose=False,
+        adata, target_gene=target_gene, GRN_file_dir=grn_dir,
     )
     t_first = time.time() - t0
 
-    # Cache file written with hash suffix; legacy file also written for
-    # backwards compatibility.
-    cached = [f for f in os.listdir(grn_dir) if f.startswith("pcNet.") and f.endswith(".npz")]
-    assert any(f == "pcNet.npz" for f in cached)
-    assert any(f != "pcNet.npz" for f in cached), "expected a hashed cache file"
+    # Exactly one cache file written, named with the content hash.
+    cached = [f for f in os.listdir(grn_dir) if f.endswith(".npz")]
+    assert len(cached) == 1, f"expected exactly one cache file, found {cached}"
 
     t0 = time.time()
     second = DataLoader(
         adata, target_gene=target_gene, rebuild_GRN=False,
-        GRN_file_dir=grn_dir, pcNet_name="pcNet", verbose=False,
+        GRN_file_dir=grn_dir,
     )
     t_second = time.time() - t0
 

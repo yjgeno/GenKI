@@ -38,10 +38,7 @@ class scBase():
             target_cell: str = None,
             obs_label: str = "ident",
             GRN_file_dir: str = "GRNs",
-            rebuild_GRN: bool = False,
-            pcNet_name: str = "pcNet",
-            use_cache: bool = True,
-            verbose: bool = False,
+            rebuild_GRN: bool = True,
             **kwargs):
 
         check_adata(adata)
@@ -54,51 +51,30 @@ class scBase():
             self._target_gene = target_gene
         if target_cell is None:
             self._counts = adata.X # use all cells, standardized counts
-            if verbose:
-                logger.debug("use all the cells (%d) in adata", self._counts.shape[0])
+            logger.debug("use all the cells (%d) in adata", self._counts.shape[0])
         elif not (obs_label in adata.obs.keys()):
             raise IndexError("require a valid cell label in adata.obs")
         else:
             self._counts = adata[adata.obs[obs_label] == target_cell, :].X
         self._counts = scipy.sparse.lil_matrix(self._counts) # sparse
 
-        legacy_path = os.path.join(GRN_file_dir, f"{pcNet_name}.npz")
-        cache_path = None
-        if use_cache:
-            grn_inputs = adata.layers["norm"]
-            cache_key = _hash_grn_inputs(grn_inputs, {"nComp": 5, **kwargs})
-            cache_path = os.path.join(GRN_file_dir, f"{pcNet_name}.{cache_key[:12]}.npz")
+        cache_key = _hash_grn_inputs(adata.layers["norm"], {"nComp": 5, **kwargs})
+        cache_path = os.path.join(GRN_file_dir, f"{cache_key[:12]}.npz")
 
-        loaded_from_cache = False
-        if use_cache and cache_path is not None and os.path.exists(cache_path):
-            if verbose:
-                logger.debug("loading GRN from cache \"%s\"", cache_path)
+        if os.path.exists(cache_path):
+            logger.debug("loading GRN from cache \"%s\"", cache_path)
             self._net = scipy.sparse.load_npz(cache_path)
-            loaded_from_cache = True
         elif rebuild_GRN:
-            if verbose:
-                logger.debug("build GRN")
-            self._net = make_pcNet(adata.layers["norm"], nComp=5, as_sparse=True, timeit=verbose, **kwargs)
+            logger.debug("build GRN")
+            self._net = make_pcNet(adata.layers["norm"], nComp=5, as_sparse=True, **kwargs)
             os.makedirs(GRN_file_dir, exist_ok=True)
-            scipy.sparse.save_npz(legacy_path, self._net)
-            if cache_path is not None:
-                scipy.sparse.save_npz(cache_path, self._net)
-            if verbose:
-                logger.debug("GRN has been built and saved in \"%s\"", legacy_path)
+            scipy.sparse.save_npz(cache_path, self._net)
+            logger.debug("GRN built and cached at \"%s\"", cache_path)
         else:
-            try:
-                if verbose:
-                    logger.debug("loading GRN from \"%s\"", legacy_path)
-                self._net = scipy.sparse.load_npz(legacy_path)
-            except (FileNotFoundError, OSError) as e:
-                raise FileNotFoundError(
-                    f"no prebuilt GRN at \"{legacy_path}\"; pass rebuild_GRN=True "
-                    f"to build it, or point GRN_file_dir/pcNet_name at an existing .npz"
-                ) from e
-        if verbose:
-            if loaded_from_cache:
-                logger.debug("GRN build skipped — cache hit")
-            logger.debug("init completed")
+            raise FileNotFoundError(
+                f"no cached GRN at \"{cache_path}\"; pass rebuild_GRN=True to build it"
+            )
+        logger.debug("init completed")
 
     @property
     def counts(self):
@@ -135,11 +111,8 @@ class DataLoader(scBase):
             target_cell: str = None,
             obs_label: str = "ident",
             GRN_file_dir: str = "GRNs",
-            rebuild_GRN: bool = False,
-            pcNet_name: str = "pcNet",
+            rebuild_GRN: bool = True,
             cutoff: int = 85,
-            use_cache: bool = True,
-            verbose: bool = False,
             **kwargs):
         super().__init__(adata,
                          target_gene,
@@ -147,11 +120,7 @@ class DataLoader(scBase):
                          obs_label,
                          GRN_file_dir,
                          rebuild_GRN,
-                         pcNet_name,
-                         use_cache,
-                         verbose,
                          **kwargs)
-        self.verbose = verbose
         self.cutoff = cutoff
         self.edge_index = torch.tensor(self._build_edges(), dtype = torch.long) # dense np to tensor
 
@@ -232,8 +201,7 @@ class DataLoader(scBase):
                 ax[i].set_title(title)
                 ax[i].legend()
             plt.show()
-        if self.verbose:
-            logger.debug("sample gene patterns (%d) from NB%s with P(zero) = %.2f", self._counts.shape[0], (n_NB, p_NB), round(1 - p_BIN, 2))
+        logger.debug("sample gene patterns (%d) from NB%s with P(zero) = %.2f", self._counts.shape[0], (n_NB, p_NB), round(1 - p_BIN, 2))
         return s
     
 
@@ -267,8 +235,7 @@ class DataLoader(scBase):
             counts_OE[:, self(self._target_gene)] = self._gen_ZINB(n_NB = weight_scale[0], decays = decays, **kwargs) 
         counts_OE = counts_OE.toarray() if scipy.sparse.issparse(counts_OE) else counts_OE
         x_OE = torch.tensor(counts_OE.T, dtype = torch.float) 
-        if self.verbose:
-            logger.debug("replace expression of %s to simulated expressions and edges by scale %s", self._target_gene, weight_scale)
+        logger.debug("replace expression of %s to simulated expressions and edges by scale %s", self._target_gene, weight_scale)
         return Data(x = x_OE, edge_index = edge_index_OE, y = self._gene_names)
 
 

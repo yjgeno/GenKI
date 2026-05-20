@@ -32,9 +32,7 @@ class GenKI:
         obs_label: str = "ident",
         cutoff: int = 85,
         grn_dir: str = "GRNs",
-        pcnet_name: str = "pcNet",
         rebuild_grn: bool = True,
-        verbose: bool = False,
         **grn_kwargs,
     ):
         self.target_gene = list(target_gene)
@@ -45,9 +43,7 @@ class GenKI:
             obs_label=obs_label,
             GRN_file_dir=grn_dir,
             rebuild_GRN=rebuild_grn,
-            pcNet_name=pcnet_name,
             cutoff=cutoff,
-            verbose=verbose,
             **grn_kwargs,
         )
         self.wt_data = self._loader.load_data()
