@@ -13,22 +13,8 @@ try:
     import ray
     _HAS_RAY = True
 except ImportError:
+    ray = None
     _HAS_RAY = False
-
-    class _DummyRay:
-        def __init__(self):
-            self.remote = lambda fn: fn
-        def is_initialized(self):
-            return False
-        def init(self, num_cpus=None):
-            return None
-        def shutdown(self):
-            return None
-        def put(self, x):
-            return x
-        def get(self, x):
-            return x
-    ray = _DummyRay()
 
 
 _SVD_SOLVERS = ("auto", "full", "randomized", "lanczos", "shared")
@@ -305,17 +291,6 @@ def make_pcNet(X,
         duration = time.time() - start_time
         logger.info("execution time of making pcNet: %.2f s (solver=%s)", duration, solver)
     return net
-
-
-# Backwards-compatible aliases so external callers / notebooks keep working.
-def pc_net_single(X, **kwargs):
-    return pcNet(X, **kwargs)
-
-
-if _HAS_RAY:
-    pc_net_parallel = ray.remote(pcNet)
-else:
-    pc_net_parallel = pcNet
 
 
 def main():

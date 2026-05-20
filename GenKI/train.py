@@ -74,8 +74,6 @@ class VGAE_trainer():
         x_noise: Standard deviation of white noise added to the training data. Defaults to None.
         edge_noise: Remove or add edges to the training data.
         """
-        # from copy import deepcopy
-        # data_ = deepcopy(self.data)
         if x_dropout is not None:
             mask = torch.FloatTensor(self.data.x.shape).uniform_() > x_dropout # % zeros
             self.data.x = self.data.x * mask
@@ -86,12 +84,7 @@ class VGAE_trainer():
             gamma = x_noise * torch.randn(self.train_data.x.shape)
             self.train_data.x = 2**gamma * self.train_data.x
             logger.debug("add white noise to training data x, level: %s SD", x_noise)
-        
-        # if x_dropout is not None:
-        #     mask = torch.FloatTensor(self.train_data.x.shape).uniform_() > x_dropout # % zeros
-        #     self.train_data.x = self.train_data.x * mask
-        #     print(f"force zeros to training data x, dropout: {x_dropout}")
-		
+
         if edge_noise is not None:
             n_pos_edge = self.train_data.pos_edge_label_index.shape[1]
             n = int(abs(edge_noise) * n_pos_edge)

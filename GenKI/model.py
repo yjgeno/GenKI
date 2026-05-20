@@ -79,7 +79,7 @@ class GAE(torch.nn.Module):
         neg_edge_index (LongTensor): The negative edges to evaluate
             against.
         """
-        from sklearn.metrics import average_precision_score, roc_auc_score #f1_score, confusion_matrix
+        from sklearn.metrics import average_precision_score, roc_auc_score
 
         pos_y = z.new_ones(pos_edge_index.size(1))
         neg_y = z.new_zeros(neg_edge_index.size(1))
@@ -90,11 +90,7 @@ class GAE(torch.nn.Module):
         pred = torch.cat([pos_pred, neg_pred], dim=0)
 
         y, pred = y.detach().cpu().numpy(), pred.detach().cpu().numpy()
-        # pred[pred < 0.5] = 0
-        # pred[pred >= 0.5] = 1
-        # tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
-
-        return roc_auc_score(y, pred), average_precision_score(y, pred) # f1_score(y, pred), [tn, fp, fn, tp]
+        return roc_auc_score(y, pred), average_precision_score(y, pred)
 
 
 class VGAE(GAE):

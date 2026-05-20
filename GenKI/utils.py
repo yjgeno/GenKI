@@ -182,22 +182,15 @@ def get_generank_gsea(data,
 
 def get_r2_score(data, geneset: list, target_gene: str):
     import statsmodels.api as sm
-    # np.random.seed(4)
 
     X = data.x.numpy().T # standardized counts
     x_genes_idx = [data.y.index(g) for g in geneset]
     y_genes_idx = data.y.index(target_gene)
-    x_genes = X[:, x_genes_idx].copy()#.toarray()
-    y_genes = X[:, y_genes_idx].copy()#.toarray()
-    # print(x_genes.shape, y_genes.shape)
+    x_genes = X[:, x_genes_idx].copy()
+    y_genes = X[:, y_genes_idx].copy()
 
     result = sm.OLS(y_genes, x_genes).fit() # y, X
     return result.rsquared, result.rsquared_adj
-    # for _ in range(30):
-    #     random_idx = np.random.choice(X.shape[1], x_genes.shape[1], replace = False)
-    #     random_genes = X[:, random_idx].copy()#.toarray()
-    #     result = sm.OLS(y_genes, random_genes).fit()
-    #     r2.append([result.rsquared, result.rsquared_adj])
 
 
 def get_sys_KO_cluster(

@@ -8,7 +8,6 @@ import logging
 import torch
 from torch_geometric.data import Data
 import matplotlib.pyplot as plt
-# from tqdm import tqdm
 from .pcNet import make_pcNet
 from .preprocessing import check_adata
 
@@ -159,8 +158,6 @@ class DataLoader(scBase):
         counts_KO[:, self(self._target_gene)] = 0
         counts_KO = counts_KO.toarray() if scipy.sparse.issparse(counts_KO) else counts_KO
         x_KO = torch.tensor(counts_KO.T, dtype = torch.float) # define counts (KO)
-        # if self.verbose:
-        #     print(f"set expression of {self._target_gene} to zeros and remove edges")
         return Data(x = x_KO, edge_index = edge_index_KO, y = self._gene_names)
 
 
@@ -237,29 +234,3 @@ class DataLoader(scBase):
         x_OE = torch.tensor(counts_OE.T, dtype = torch.float) 
         logger.debug("replace expression of %s to simulated expressions and edges by scale %s", self._target_gene, weight_scale)
         return Data(x = x_OE, edge_index = edge_index_OE, y = self._gene_names)
-
-
-    # def run_sys_KO(self, model, genelist):
-    #     '''
-    #     model: a trained VGAE model.
-    #     genelist: array-like, gene list to be systematic KO
-    #     '''
-    #     self.verbose = False
-    #     g_orig = self._target_gene 
-    #     data = self.data_init()
-    #     z_m0, z_S0 = get_latent_vars(data, model)
-    #     sys_res = []
-    #     from tqdm import tqdm
-    #     for g in tqdm(genelist, desc = "systematic KO...", total = len(genelist)):
-    #         if g not in self._gene_names:
-    #             raise IndexError(f'"{g}" is not in the object')
-    #         else:  
-    #             self._target_gene = g # reset KO gene
-    #             data_v = self.KO_data_init()
-    #             z_mv, z_Sv = get_latent_vars(data_v, model)
-    #             dis = get_distance(z_mv, z_Sv, z_m0, z_S0, by = "KL")
-    #             sys_res.append(dis)
-    #     self._target_gene = g_orig
-    #     # print(self._target_gene)
-    #     self.verbose = True
-    #     return np.array(sys_res) 

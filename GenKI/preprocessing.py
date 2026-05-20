@@ -39,7 +39,6 @@ def _read_counts(counts_path: str,
             import numpy as np
             import h5py
             f = h5py.File(counts_path,'r')
-            # print(f.keys())
             counts = np.array(f.get(list(f.keys())[0]), dtype="float64")
             if transpose:
                 counts = counts.T
@@ -89,7 +88,6 @@ def build_adata(
    
     if meta_gene_path is not None and Path(meta_gene_path).is_file():
         try:
-            # print("add metadata for genes")
             df_gene = pd.read_csv(meta_gene_path, header=header, sep=sep)
             df_gene.index = df_gene.index.astype("str")
             adata.var_names = df_gene[0]
@@ -97,7 +95,6 @@ def build_adata(
             raise ValueError("incorrect file path given to meta_gene")
     if meta_cell_path is not None and Path(meta_cell_path).is_file():
         try:
-            # print("add metadata for cells")
             df_cell = pd.read_csv(meta_cell_path, header=header, sep=sep)
             df_cell.index = df_cell.index.astype("str")
             adata.obs = df_cell
@@ -107,7 +104,6 @@ def build_adata(
             raise ValueError("incorrect file path given to meta_cell")
 
     if log_normalize:
-        # print("normalize counts")
         adata.layers["raw"] = adata.X
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
@@ -115,14 +111,12 @@ def build_adata(
 
     if scale_data:
         adata.layers["norm"] = adata.X
-        # print("standardize counts")
         from sklearn import preprocessing
         counts = adata.X.toarray() if sparse.issparse(adata.X) else adata.X
         scaler = preprocessing.StandardScaler().fit(counts)
         adata.X = scaler.transform(counts)
 
     if as_sparse:
-        # print("make counts sparse")
         adata.X = (
             sparse.csr_matrix(adata.X) if not sparse.issparse(adata.X) else adata.X
         )
@@ -170,7 +164,6 @@ def split_data(dir: str = "data", data = None, load: bool = False, save: bool = 
                                 num_test = 0.2,
                                 )
     train_data, val_data, test_data = transform(data)
-    # print("split data into train/valid/test")
     if save:
         save_gdata(train_data, dir, "train_data")
         save_gdata(val_data, dir, "val_data")
