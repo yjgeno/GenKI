@@ -2,11 +2,14 @@ import numpy as np
 import pandas as pd
 import os
 import scipy
+import logging
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.vq import kmeans2
 import math
+
+logger = logging.getLogger(__name__)
 
 
 def boxcox_norm(x):
@@ -136,7 +139,7 @@ def get_generank(
             np.savetxt(
                 os.path.join("result", f"{save_significant_as}.txt"), output, fmt="%s", delimiter=","
             )
-            print(f"save {len(output)} genes to \"./result/{save_significant_as}.txt\"")
+            logger.info("save %d genes to \"./result/%s.txt\"", len(output), save_significant_as)
     else:
         df_KL = pd.DataFrame(
             data=distance, index=np.array(data.y), columns=["dis"]
@@ -173,28 +176,21 @@ def get_generank_gsea(data,
         np.savetxt(
             os.path.join("result", "GSEA_{save_as}.txt"), output_gsea, fmt="%s", delimiter="\t"
         )
-        print(f"save ranked genes to \"./result/GSEA_{save_as}.txt\"")
+        logger.info("save ranked genes to \"./result/GSEA_%s.txt\"", save_as)
     return df_gsea
 
 
 def get_r2_score(data, geneset: list, target_gene: str):
     import statsmodels.api as sm
-    # np.random.seed(4)
 
     X = data.x.numpy().T # standardized counts
     x_genes_idx = [data.y.index(g) for g in geneset]
     y_genes_idx = data.y.index(target_gene)
-    x_genes = X[:, x_genes_idx].copy()#.toarray()
-    y_genes = X[:, y_genes_idx].copy()#.toarray()
-    # print(x_genes.shape, y_genes.shape)
+    x_genes = X[:, x_genes_idx].copy()
+    y_genes = X[:, y_genes_idx].copy()
 
     result = sm.OLS(y_genes, x_genes).fit() # y, X
     return result.rsquared, result.rsquared_adj
-    # for _ in range(30):
-    #     random_idx = np.random.choice(X.shape[1], x_genes.shape[1], replace = False)
-    #     random_genes = X[:, random_idx].copy()#.toarray()
-    #     result = sm.OLS(y_genes, random_genes).fit()
-    #     r2.append([result.rsquared, result.rsquared_adj])
 
 
 def get_sys_KO_cluster(
@@ -228,8 +224,9 @@ def get_sys_KO_cluster(
     cluster_idx = np.where(label == label[obj(obj._target_gene)])
     cluster_gene_names = np.array(obj._gene_names)[cluster_idx]
     if verbose:
-        print(
-            f"TSNE perplexity: {perplexity}, # Clustering: {n_cluster}\nThe cluster containing {obj._target_gene} has {len(cluster_gene_names)} genes"
+        logger.debug(
+            "TSNE perplexity: %d, # Clustering: %d\nThe cluster containing %s has %d genes",
+            perplexity, n_cluster, obj._target_gene, len(cluster_gene_names),
         )
     if save_as is not None:
         os.makedirs("result", exist_ok=True)
@@ -239,7 +236,7 @@ def get_sys_KO_cluster(
             fmt="%s",
             delimiter="\t",
         )
-        print(f"save ranked genes to \"./result/sys_KO_{save_as}.txt\"")
+        logger.info("save ranked genes to \"./result/sys_KO_%s.txt\"", save_as)
     if show_TSNE:
         fig, ax = plt.subplots(figsize=(8, 8), dpi=80)
         colors = [

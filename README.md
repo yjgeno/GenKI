@@ -36,6 +36,10 @@ conda env create -f environment.yml
 conda activate ogenki
 ```
 
+## Example Data
+
+A real microglial (wild-type) scRNA-seq dataset is bundled in [`data/microglial_seurat_WT.h5ad`](data/microglial_seurat_WT.h5ad) so you can run GenKI immediately without sourcing your own data. The Quick Start examples below use it directly.
+
 ## Quick Start
 
 The high-level `GenKI` facade runs the whole workflow — load & preprocess data, build the GRN, train the VGAE, and rank genes — in one call:
@@ -43,8 +47,9 @@ The high-level `GenKI` facade runs the whole workflow — load & preprocess data
 ```python
 from GenKI import GenKI
 
+# Uses the bundled example dataset — no extra downloads needed
 ranked = GenKI.from_h5ad(
-    "data/my_data.h5ad",
+    "data/microglial_seurat_WT.h5ad",
     target_gene=["TUBG1"],   # gene(s) to knock out (upper-cased by default)
 ).run(epochs=100, seed=8096, n_permutations=100)
 
@@ -54,7 +59,7 @@ print(ranked)   # genes ranked by perturbation effect
 Separate the training and prediction steps when you want to inspect the model in between:
 
 ```python
-gk = GenKI.from_h5ad("data/my_data.h5ad", target_gene=["TUBG1"])
+gk = GenKI.from_h5ad("data/microglial_seurat_WT.h5ad", target_gene=["TUBG1"])
 gk.fit(epochs=100, lr=7e-4, beta=1e-4, seed=8096)
 ranked = gk.predict(n_permutations=100, by="KL")
 
@@ -67,7 +72,7 @@ Start from an in-memory `AnnData` instead of a file (set `preprocess=True` to no
 ```python
 import scanpy as sc
 
-adata = sc.read_h5ad("data/my_data.h5ad")
+adata = sc.read_h5ad("data/microglial_seurat_WT.h5ad")
 gk = GenKI.from_adata(adata, target_gene=["TUBG1"], preprocess=True)
 ranked = gk.run(seed=8096)
 ```
@@ -84,7 +89,7 @@ from GenKI.train import VGAE_trainer
 from GenKI import utils
 
 # 1. Load and preprocess data
-adata = build_adata("data/my_data.h5ad")
+adata = build_adata("data/microglial_seurat_WT.h5ad")
 
 # 2. Build GRN and prepare WT / virtual-KO graph data
 data_wrapper = DataLoader(
@@ -92,9 +97,6 @@ data_wrapper = DataLoader(
     target_gene=["TUBG1"],   # gene to knock out
     target_cell=None,         # None = use all cells
     GRN_file_dir="GRNs",
-    rebuild_GRN=True,
-    pcNet_name="pcNet",
-    verbose=True,
     n_cpus=8,
 )
 data_wt = data_wrapper.load_data()
