@@ -79,6 +79,23 @@ ranked = gk.run(seed=8096)
 
 Building the GRN in parallel needs the optional Ray extra (`pip install "GenKI[ray]"`); pass `n_cpus` and other GRN options as keyword arguments, e.g. `GenKI.from_h5ad(..., rebuild_grn=True, n_cpus=8)`.
 
+## GRN build time
+
+`make_pcNet` fits a leave-one-out principal-component regression for every gene, so cost grows roughly as **O(genes² × cells × nComp)**. The table below is wall-clock seconds on an Apple M1 Pro (8 cores, 16 GB RAM) under the default settings (`nComp=3`, `svd_solver="auto"`, `n_cpus=8`) on a low-rank synthetic matrix; real scRNA-seq scales similarly at the same shape.
+
+| cells \ genes | 1 000 | 3 000 | 5 000 |
+|---:|---:|---:|---:|
+| **500**  | 11 s | 29 s | 77 s |
+| **1 000** | 12 s | 52 s | 2 min 13 s |
+| **2 000** | 18 s | 1 min 37 s | 4 min 22 s |
+
+For reference, the bundled `notebook/Example.ipynb` (1 139 cells × 3 000 genes, `n_cpus=8`) builds the GRN in about **1 minute** on this hardware.
+
+Notes:
+- Cost scales roughly linearly in `cells` and quadratically in `genes` once you're past the per-call Ray overhead (~10 s for `n_cpus=8`).
+- `n_cpus > 1` requires the optional Ray extra (`pip install "GenKI[ray]"`); the speedup from sharding is modest because numpy's BLAS already multithreads the per-gene SVDs.
+- GRNs are cached as `.npz` under `GRN_file_dir` (default `GRNs/`) — you pay this cost once per (cells, genes, nComp) selection. Pass `rebuild_grn=True` only when one of those changes.
+
 <details>
 <summary><b>Lower-level API</b> (fine-grained control over each step)</summary>
 
