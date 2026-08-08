@@ -1,4 +1,7 @@
+/* Always light — intentionally ignores prefers-color-scheme so the UI reads
+   consistently regardless of the visitor's OS/browser theme. */
 :root {
+  color-scheme: light;
   --bg: #ffffff;
   --fg: #1b1f24;
   --muted: #5b6470;
@@ -8,20 +11,6 @@
   --card: #f6f8fa;
   --error: #b3261e;
   --error-bg: #fdecea;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1117;
-    --fg: #e6edf3;
-    --muted: #9aa4b2;
-    --border: #30363d;
-    --accent: #4c8dff;
-    --accent-fg: #0d1117;
-    --card: #161b22;
-    --error: #ff8482;
-    --error-bg: #3a1616;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -214,17 +203,19 @@ th, td {
 }
 
 th {
-  cursor: pointer;
-  user-select: none;
   color: var(--muted);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
-th:hover { color: var(--fg); }
-
 tr.target-row td { font-weight: 700; }
+
+.table-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 
 #download-csv {
   display: inline-block;

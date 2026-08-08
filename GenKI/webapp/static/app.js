@@ -4,7 +4,6 @@ const state = {
   dataset: null, // {dataset_id, name, n_genes, n_cells, gene_names, obs_labels}
   targetGenes: [],
   resultRows: null,
-  sort: { key: "rank", dir: 1 },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -260,69 +259,54 @@ function pollJob(jobId) {
   });
 }
 
+const TOP_N = 15;
+
 async function loadResult(jobId) {
   const result = await api(`/api/jobs/${jobId}/result`);
   $("status-bar").textContent = `done — ${result.rows.length} genes ranked`;
   state.resultRows = result.rows;
   state.targetGeneSet = new Set(result.target_gene);
-  state.sort = { key: "rank", dir: 1 };
   renderResultsTable();
 
   const link = $("download-csv");
   link.href = `/api/jobs/${jobId}/result.csv`;
-  link.textContent = "Download CSV";
+  link.textContent = `Download full CSV (${result.rows.length} genes)`;
   link.classList.remove("hidden");
 }
 
+// Shows only the top TOP_N genes by rank; the full ranked list (with
+// distance/hit-count columns) is always available via the CSV download.
 function renderResultsTable() {
-  const rows = [...state.resultRows];
-  const { key, dir } = state.sort;
-  rows.sort((a, b) => {
-    const av = a[key], bv = b[key];
-    if (av == null) return 1;
-    if (bv == null) return -1;
-    if (typeof av === "string") return dir * av.localeCompare(bv);
-    return dir * (av - bv);
-  });
+  const rows = [...state.resultRows]
+    .sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity))
+    .slice(0, TOP_N);
 
-  const columns = [
-    { key: "rank", label: "Rank" },
-    { key: "gene", label: "Gene" },
-    { key: "dis", label: "Distance" },
-    { key: "hit", label: "Hits" },
-  ];
+  const caption = document.createElement("p");
+  caption.className = "table-caption";
+  caption.textContent =
+    `Top ${rows.length} of ${state.resultRows.length} ranked genes:`;
 
   const table = document.createElement("table");
   const thead = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  for (const col of columns) {
-    const th = document.createElement("th");
-    th.textContent = col.label + (state.sort.key === col.key ? (dir === 1 ? " ▲" : " ▼") : "");
-    th.addEventListener("click", () => {
-      state.sort =
-        state.sort.key === col.key ? { key: col.key, dir: -dir } : { key: col.key, dir: 1 };
-      renderResultsTable();
-    });
-    headRow.appendChild(th);
-  }
-  thead.appendChild(headRow);
+  thead.innerHTML = "<tr><th>Rank</th><th>Gene</th></tr>";
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
   for (const row of rows) {
     const tr = document.createElement("tr");
     if (state.targetGeneSet.has(row.gene)) tr.className = "target-row";
-    for (const col of columns) {
-      const td = document.createElement("td");
-      const v = row[col.key];
-      td.textContent = v == null ? "–" : col.key === "dis" ? v.toFixed(4) : v;
-      tr.appendChild(td);
-    }
+    const rankTd = document.createElement("td");
+    rankTd.textContent = row.rank ?? "–";
+    const geneTd = document.createElement("td");
+    geneTd.textContent = row.gene;
+    tr.appendChild(rankTd);
+    tr.appendChild(geneTd);
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
 
   const wrap = $("results-table-wrap");
   wrap.innerHTML = "";
+  wrap.appendChild(caption);
   wrap.appendChild(table);
 }

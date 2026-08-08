@@ -10,6 +10,14 @@ A Variational Graph Auto-Encoder (VGAE) model for predicting gene perturbation e
     <img src="logo.jpg" alt="GenKI logo" width="300"/>
 </p>
 
+> 🆕 **New: a local web UI.** Run GenKI from your browser — no code required.
+> ```shell
+> pip install "GenKI[web]"
+> genki-ui
+> ```
+> Upload a `.h5ad`, pick a gene to knock out, and get ranked results in a few
+> clicks. See [Web UI](#web-ui) below.
+
 ## Prerequisites
 
 GenKI requires **Python ≥ 3.10**. **PyTorch** and **PyTorch Geometric** are installed automatically (CPU builds) with the package. For a GPU/CUDA build, install them first to match your CUDA version:
@@ -95,6 +103,10 @@ From a git checkout you can also skip the upload step and use the bundled
 example dataset directly in the UI (the 124 MB `data/` file isn't shipped in
 the PyPI package, so that shortcut only works from source). Everything runs
 locally; no data leaves your machine.
+
+Pick one or more genes to knock out, tune epochs/learning rate/permutations
+if you like, and hit **Run**. The UI shows the top 15 ranked genes at a
+glance; download the CSV for the full ranked list.
 
 ## GRN build time
 
