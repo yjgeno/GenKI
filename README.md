@@ -31,12 +31,6 @@ GenKI requires **Python ≥ 3.10**. **PyTorch** and **PyTorch Geometric** are in
 pip install GenKI
 ```
 
-Or install directly from source:
-
-```shell
-pip install git+https://github.com/yjgeno/GenKI.git
-```
-
 Or with conda (sets up the full environment):
 
 ```shell
