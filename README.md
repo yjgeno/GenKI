@@ -18,6 +18,10 @@ A Variational Graph Auto-Encoder (VGAE) model for predicting gene perturbation e
 > Upload a `.h5ad`, pick a gene to knock out, and get ranked results in a few
 > clicks. See [Web UI](#web-ui) below.
 
+<p align="center">
+    <img src="docs/webapp-screenshot.png" alt="GenKI local web UI: load a dataset, pick target genes, and configure a knock-out run" width="600"/>
+</p>
+
 ## Prerequisites
 
 GenKI requires **Python ≥ 3.10**. **PyTorch** and **PyTorch Geometric** are installed automatically (CPU builds) with the package. For a GPU/CUDA build, install them first to match your CUDA version:
