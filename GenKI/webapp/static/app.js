@@ -213,6 +213,7 @@ $("run-form").addEventListener("submit", async (evt) => {
   $("results-table-wrap").innerHTML = "";
   hide($("download-csv"));
   $("status-bar").textContent = "submitting…";
+  setProgress(0);
 
   try {
     const { job_id } = await api("/api/jobs", {
@@ -223,11 +224,33 @@ $("run-form").addEventListener("submit", async (evt) => {
     await pollJob(job_id);
   } catch (err) {
     $("status-bar").textContent = "";
+    setProgress(null, "error");
     showError($("results-error"), err.message);
   } finally {
     $("run-button").disabled = false;
   }
 });
+
+// Rough progress reflects the job's current stage (see GenKI/webapp/jobs.py
+// STAGE_* constants) — training/permutation-test sub-progress isn't tracked
+// per-epoch, so each stage jumps straight to its target percentage.
+const STAGE_PROGRESS = {
+  queued: 3,
+  "building GRN": 10,
+  training: 40,
+  "computing null distribution": 75,
+  "ranking genes": 92,
+  done: 100,
+};
+
+function setProgress(percent, mode) {
+  const wrap = $("progress-wrap");
+  const fill = $("progress-fill");
+  wrap.classList.remove("hidden");
+  fill.classList.toggle("done", mode === "done");
+  fill.classList.toggle("error", mode === "error");
+  if (percent != null) fill.style.width = `${percent}%`;
+}
 
 function pollJob(jobId) {
   return new Promise((resolve, reject) => {
@@ -240,10 +263,12 @@ function pollJob(jobId) {
         return;
       }
       if (status.status === "error") {
+        setProgress(null, "error");
         reject(new Error(status.error || "job failed"));
         return;
       }
       $("status-bar").textContent = `${status.stage}…`;
+      setProgress(STAGE_PROGRESS[status.stage] ?? 5);
       if (status.status === "done") {
         try {
           await loadResult(jobId);
@@ -264,6 +289,7 @@ const TOP_N = 15;
 async function loadResult(jobId) {
   const result = await api(`/api/jobs/${jobId}/result`);
   $("status-bar").textContent = `done — ${result.rows.length} genes ranked`;
+  setProgress(100, "done");
   state.resultRows = result.rows;
   state.targetGeneSet = new Set(result.target_gene);
   renderResultsTable();

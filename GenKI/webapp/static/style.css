@@ -184,9 +184,53 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   line-height: 1;
 }
 
+.progress-wrap {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--accent);
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.25) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.25) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+  transition: width 0.4s ease;
+  animation: progress-stripes 1s linear infinite;
+}
+
+.progress-fill.done {
+  animation: none;
+  background-image: none;
+}
+
+.progress-fill.error {
+  animation: none;
+  background-image: none;
+  background: var(--error);
+}
+
+@keyframes progress-stripes {
+  from { background-position: 1rem 0; }
+  to { background-position: 0 0; }
+}
+
 .status {
   font-weight: 600;
   color: var(--muted);
+  margin-top: 0.6rem;
 }
 
 table {

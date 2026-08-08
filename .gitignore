@@ -134,6 +134,7 @@ notebook/*
 BACKUP
 data*
 log_dir
+GRNs/
 !notebook/*.py
 !notebook/Example.ipynb
 !notebook/Compatible_matlab.ipynb
