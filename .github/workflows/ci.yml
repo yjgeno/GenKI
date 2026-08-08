@@ -31,8 +31,8 @@ jobs:
         with:
           python-version: "3.10"
           cache: pip
-      - name: Install package with dev extras
-        run: pip install ".[dev]"
+      - name: Install package with dev and web extras
+        run: pip install ".[dev,web]"
       - name: Run tests
         run: pytest
 
