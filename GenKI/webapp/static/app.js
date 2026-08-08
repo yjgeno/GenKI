@@ -128,21 +128,37 @@ function populateTargetCellOptions() {
 
 // -- target gene picker ---------------------------------------------
 
-$("target-gene-input").addEventListener("keydown", (evt) => {
-  if (evt.key !== "Enter") return;
-  evt.preventDefault();
-  const raw = evt.target.value.trim().toUpperCase();
-  if (!raw) return;
+// Returns true if `raw` was a valid, newly-added (or already-added) gene.
+function tryAddGene(raw) {
+  raw = raw.trim().toUpperCase();
+  if (!raw) return false;
   if (!state.dataset.gene_names.includes(raw)) {
     showError($("dataset-error"), `"${raw}" is not a gene in the loaded dataset`);
-    return;
+    return false;
   }
   hide($("dataset-error"));
   if (!state.targetGenes.includes(raw)) {
     state.targetGenes.push(raw);
     renderChips();
   }
-  evt.target.value = "";
+  return true;
+}
+
+$("target-gene-input").addEventListener("keydown", (evt) => {
+  if (evt.key !== "Enter") return;
+  evt.preventDefault();
+  if (tryAddGene(evt.target.value)) evt.target.value = "";
+});
+
+// Clicking an option in the native <datalist> dropdown only changes the
+// input's value (no Enter keydown fires), so commit it as soon as the
+// value exactly matches a known gene — covers mouse/touch selection.
+$("target-gene-input").addEventListener("input", (evt) => {
+  const raw = evt.target.value.trim().toUpperCase();
+  if (state.dataset && state.dataset.gene_names.includes(raw)) {
+    tryAddGene(raw);
+    evt.target.value = "";
+  }
 });
 
 function renderChips() {
@@ -169,6 +185,10 @@ function renderChips() {
 
 $("run-form").addEventListener("submit", async (evt) => {
   evt.preventDefault();
+  const geneInput = $("target-gene-input");
+  if (geneInput.value.trim() && tryAddGene(geneInput.value)) {
+    geneInput.value = "";
+  }
   if (state.targetGenes.length === 0) {
     showError($("dataset-error"), "add at least one target gene");
     return;
