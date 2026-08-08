@@ -79,6 +79,23 @@ ranked = gk.run(seed=8096)
 
 Building the GRN in parallel needs the optional Ray extra (`pip install "GenKI[ray]"`); pass `n_cpus` and other GRN options as keyword arguments, e.g. `GenKI.from_h5ad(..., rebuild_grn=True, n_cpus=8)`.
 
+## Web UI
+
+Prefer clicking over scripting? Install the `web` extra and launch a local
+UI — upload a `.h5ad`, pick a target gene, and run the workflow from the
+browser, no code required:
+
+```shell
+pip install "GenKI[web]"
+genki-ui
+# opens http://127.0.0.1:8000
+```
+
+From a git checkout you can also skip the upload step and use the bundled
+example dataset directly in the UI (the 124 MB `data/` file isn't shipped in
+the PyPI package, so that shortcut only works from source). Everything runs
+locally; no data leaves your machine.
+
 ## GRN build time
 
 `make_pcNet` fits a leave-one-out principal-component regression for every gene, so cost grows roughly as **O(genes² × cells × nComp)**. The table below is wall-clock seconds on an Apple M1 Pro (8 cores, 16 GB RAM) under the default settings (`nComp=3`, `svd_solver="auto"`, `n_cpus=8`) on a low-rank synthetic matrix; real scRNA-seq scales similarly at the same shape.
