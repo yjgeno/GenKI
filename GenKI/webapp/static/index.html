@@ -88,9 +88,9 @@
           </label>
           <label class="field">
             <span class="field-label">Parallel workers
-              <span class="info-icon" tabindex="0" data-tooltip="CPU workers used to build the gene regulatory network. -1 uses all local cores; must not be 0. Values other than 1 require the optional ray extra (pip install &quot;GenKI[ray]&quot;) &mdash; without it, the build silently falls back to a single process." aria-label="CPU workers used to build the gene regulatory network. -1 uses all local cores; must not be 0. Values other than 1 require the optional ray extra, pip install GenKI with the ray extra; without it, the build silently falls back to a single process.">i</span>
+              <span class="info-icon" tabindex="0" data-tooltip="CPU workers used to build the gene regulatory network. -1 (default) uses all local cores for the fastest build; must not be 0. Uses the ray extra bundled with GenKI[web] &mdash; falls back to a single process if ray isn't installed." aria-label="CPU workers used to build the gene regulatory network. -1 (default) uses all local cores for the fastest build; must not be 0. Uses the ray extra bundled with GenKI web install, falls back to a single process if ray isn't installed.">i</span>
             </span>
-            <input type="number" id="n-cpus" value="1" step="1" min="-1">
+            <input type="number" id="n-cpus" value="-1" step="1" min="-1">
           </label>
         </div>
 

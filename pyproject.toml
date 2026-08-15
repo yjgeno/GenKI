@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ray = ["ray>=2.0"]
-web = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
+web = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9", "ray>=2.0"]
 dev = ["build", "httpx>=0.27", "pytest>=7.0", "ruff", "twine"]
 
 [project.scripts]

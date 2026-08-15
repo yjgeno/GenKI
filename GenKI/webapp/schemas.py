@@ -30,10 +30,11 @@ class JobCreate(BaseModel):
     n_permutations: int = Field(100, ge=0, le=2000)
     by: str = "KL"
     n_cpus: int = Field(
-        1,
+        -1,
         description=(
-            "parallel workers for GRN construction; -1 uses all local CPUs. "
-            "Requires the optional ray extra (GenKI[ray]) for values other than 1."
+            "parallel workers for GRN construction; -1 (default) uses all local "
+            "CPUs. Requires the ray extra, bundled with GenKI[web]; falls back "
+            "to a single process if ray isn't installed."
         ),
     )
 
