@@ -103,6 +103,38 @@ def test_run_job_end_to_end(client, small_h5ad_path, small_adata):
     assert "gene,dis" in csv_resp.text.splitlines()[0]
 
 
+@pytest.mark.parametrize("bad_n_cpus", [0, -2, 1.5])
+def test_invalid_n_cpus_rejected(client, small_h5ad_path, bad_n_cpus):
+    dataset = _upload(client, small_h5ad_path)
+    resp = client.post(
+        "/api/jobs",
+        json={
+            "dataset_id": dataset["dataset_id"],
+            "target_gene": [dataset["gene_names"][0]],
+            "epochs": 2,
+            "n_permutations": 0,
+            "n_cpus": bad_n_cpus,
+        },
+    )
+    assert resp.status_code == 422, resp.text
+
+
+def test_run_job_with_explicit_n_cpus(client, small_h5ad_path, small_adata):
+    """n_cpus reaches make_pcNet and doesn't disrupt a normal run.
+
+    Ray may or may not be installed in the test environment; either way
+    pcNet.make_pcNet degrades gracefully (see test_pcnet.py), so this just
+    checks the job still completes and returns a full ranking.
+    """
+    dataset = _upload(client, small_h5ad_path)
+    target = str(small_adata.var_names[0]).upper()
+
+    job_id = _run_job_to_completion(client, dataset, target, n_cpus=2)
+
+    result = client.get(f"/api/jobs/{job_id}/result").json()
+    assert len(result["rows"]) == dataset["n_genes"]
+
+
 def test_invalid_target_gene_rejected(client, small_h5ad_path):
     dataset = _upload(client, small_h5ad_path)
     resp = client.post(

@@ -11,8 +11,9 @@ A Variational Graph Auto-Encoder (VGAE) model for predicting gene perturbation e
 </p>
 
 > 🆕 **New: a local web UI.** Run GenKI from your browser — no code required.
+> Requires **Python ≥ 3.10**.
 > ```shell
-> pip install "GenKI[web]"
+> pip install --no-cache-dir "GenKI[web]"
 > genki-ui
 > ```
 > Upload a `.h5ad`, pick a gene to knock out, and get ranked results in a few
@@ -24,10 +25,7 @@ A Variational Graph Auto-Encoder (VGAE) model for predicting gene perturbation e
 
 ## Prerequisites
 
-GenKI requires **Python ≥ 3.10**. **PyTorch** and **PyTorch Geometric** are installed automatically (CPU builds) with the package. For a GPU/CUDA build, install them first to match your CUDA version:
-
-1. [Install PyTorch](https://pytorch.org/get-started/locally/)
-2. [Install PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
+**Python ≥ 3.10.** PyTorch and PyTorch Geometric install automatically (CPU builds). For GPU/CUDA, install them first to match your CUDA version: [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html).
 
 ## Installation
 
@@ -42,18 +40,16 @@ conda env create -f environment.yml
 conda activate ogenki
 ```
 
-## Example Data
-
-A real microglial (wild-type) scRNA-seq dataset is bundled in [`data/microglial_seurat_WT.h5ad`](data/microglial_seurat_WT.h5ad) so you can run GenKI immediately without sourcing your own data. The Quick Start examples below use it directly.
-
 ## Quick Start
 
-The high-level `GenKI` facade runs the whole workflow — load & preprocess data, build the GRN, train the VGAE, and rank genes — in one call:
+A real microglial (wild-type) scRNA-seq dataset is bundled at
+[`data/microglial_seurat_WT.h5ad`](data/microglial_seurat_WT.h5ad) so you can
+run GenKI immediately. The `GenKI` facade runs the whole workflow — load &
+preprocess, build the GRN, train the VGAE, rank genes — in one call:
 
 ```python
 from GenKI import GenKI
 
-# Uses the bundled example dataset — no extra downloads needed
 ranked = GenKI.from_h5ad(
     "data/microglial_seurat_WT.h5ad",
     target_gene=["TUBG1"],   # gene(s) to knock out (upper-cased by default)
@@ -62,53 +58,41 @@ ranked = GenKI.from_h5ad(
 print(ranked)   # genes ranked by perturbation effect
 ```
 
-Separate the training and prediction steps when you want to inspect the model in between:
-
-```python
-gk = GenKI.from_h5ad("data/microglial_seurat_WT.h5ad", target_gene=["TUBG1"])
-gk.fit(epochs=100, lr=7e-4, beta=1e-4, seed=8096)
-ranked = gk.predict(n_permutations=100, by="KL")
-
-print(gk.metrics)        # (epochs, loss, AUROC, AP)
-gk.loader, gk.trainer    # escape hatch to the underlying objects
-```
-
-Start from an in-memory `AnnData` instead of a file (set `preprocess=True` to normalize/standardize it):
-
-```python
-import scanpy as sc
-
-adata = sc.read_h5ad("data/microglial_seurat_WT.h5ad")
-gk = GenKI.from_adata(adata, target_gene=["TUBG1"], preprocess=True)
-ranked = gk.run(seed=8096)
-```
-
-Building the GRN in parallel needs the optional Ray extra (`pip install "GenKI[ray]"`); pass `n_cpus` and other GRN options as keyword arguments, e.g. `GenKI.from_h5ad(..., rebuild_grn=True, n_cpus=8)`.
+Use `.fit()`/`.predict()` separately to inspect the model in between, or
+`GenKI.from_adata(adata, target_gene=[...], preprocess=True)` to start from
+an in-memory `AnnData`. For fine-grained control over each step (data
+loading, GRN construction, training, ranking), see the collapsed example
+below. Building the GRN in parallel needs the optional Ray extra
+(`pip install "GenKI[ray]"`); pass `n_cpus` as a keyword argument, e.g.
+`GenKI.from_h5ad(..., rebuild_grn=True, n_cpus=8)`.
 
 ## Web UI
 
 Prefer clicking over scripting? Install the `web` extra and launch a local
 UI — upload a `.h5ad`, pick a target gene, and run the workflow from the
-browser, no code required:
+browser, no code required. Requires **Python ≥ 3.10**; on an older
+interpreter pip silently installs an ancient release without the `web`
+extra:
 
 ```shell
-pip install "GenKI[web]"
+pip install --no-cache-dir "GenKI[web]"
 genki-ui
-# opens http://127.0.0.1:8000
+# opens http://127.0.0.1:8931 (pass --port to use a different one)
 ```
 
 From a git checkout you can also skip the upload step and use the bundled
-example dataset directly in the UI (the 124 MB `data/` file isn't shipped in
-the PyPI package, so that shortcut only works from source). Everything runs
-locally; no data leaves your machine.
+example dataset directly (it isn't shipped in the PyPI package). Everything
+runs locally; no data leaves your machine.
 
 Pick one or more genes to knock out, tune epochs/learning rate/permutations
-if you like, and hit **Run**. The UI shows the top 15 ranked genes at a
-glance; download the CSV for the full ranked list.
+if you like, and hit **Run**. Hover the ⓘ next to a field for what it does.
+The GRN build defaults to all local CPUs (**Parallel workers** = `-1`, via
+the bundled Ray extra); set a positive integer to cap it, or `1` for a
+single process (`0` is invalid).
 
 ## GRN build time
 
-`make_pcNet` fits a leave-one-out principal-component regression for every gene, so cost grows roughly as **O(genes² × cells × nComp)**. The table below is wall-clock seconds on an Apple M1 Pro (8 cores, 16 GB RAM) under the default settings (`nComp=3`, `svd_solver="auto"`, `n_cpus=8`) on a low-rank synthetic matrix; real scRNA-seq scales similarly at the same shape.
+`make_pcNet` fits a leave-one-out principal-component regression for every gene, so cost grows roughly as **O(genes² × cells × nComp)**. Wall-clock seconds on an Apple M1 Pro (8 cores, 16 GB RAM) under the default settings (`nComp=3`, `svd_solver="auto"`, `n_cpus=8`):
 
 | cells \ genes | 1 000 | 3 000 | 5 000 |
 |---:|---:|---:|---:|
@@ -116,12 +100,7 @@ glance; download the CSV for the full ranked list.
 | **1 000** | 12 s | 52 s | 2 min 13 s |
 | **2 000** | 18 s | 1 min 37 s | 4 min 22 s |
 
-For reference, the bundled `notebook/Example.ipynb` (1 139 cells × 3 000 genes, `n_cpus=8`) builds the GRN in about **1 minute** on this hardware.
-
-Notes:
-- Cost scales roughly linearly in `cells` and quadratically in `genes` once you're past the per-call Ray overhead (~10 s for `n_cpus=8`).
-- `n_cpus > 1` requires the optional Ray extra (`pip install "GenKI[ray]"`); the speedup from sharding is modest because numpy's BLAS already multithreads the per-gene SVDs.
-- GRNs are cached as `.npz` under `GRN_file_dir` (default `GRNs/`) — you pay this cost once per (cells, genes, nComp) selection. Pass `rebuild_grn=True` only when one of those changes.
+For reference, `notebook/Example.ipynb` (1 139 cells × 3 000 genes, `n_cpus=8`) builds the GRN in about **1 minute**. Cost scales roughly linearly in `cells` and quadratically in `genes`; `n_cpus > 1` needs the optional Ray extra and pays a fixed ~10 s startup cost. GRNs are cached under `GRN_file_dir` (default `GRNs/`) — pass `rebuild_grn=True` only when `cells`/`genes`/`nComp` change.
 
 <details>
 <summary><b>Lower-level API</b> (fine-grained control over each step)</summary>
@@ -162,18 +141,6 @@ print(res)
 ```
 
 </details>
-
-## API
-
-| Symbol | Description |
-|---|---|
-| `GenKI.GenKI` | High-level facade: `from_h5ad` / `from_adata` constructors and `fit` / `predict` / `run` methods covering the full workflow |
-| `GenKI.dataLoader.DataLoader` | Wraps an `AnnData` object, builds/loads the GRN, and produces PyG `Data` objects for WT and virtual-KO conditions |
-| `GenKI.train.VGAE_trainer` | Trains the VGAE, exposes latent variables, permutation testing, and model save/load |
-| `GenKI.utils.get_distance` | Computes per-gene distribution distance (KL, EMD, t-test) between two latent spaces |
-| `GenKI.utils.get_generank` | Ranks genes by perturbation score; optionally filters by permutation-test significance |
-| `GenKI.preprocessing.build_adata` | Loads an `.h5ad` file and adds a log-normalised layer used by `DataLoader` |
-| `GenKI.pcNet.make_pcNet` | Builds a principal-component-based GRN from expression data (optionally parallelised with Ray) |
 
 ## Tutorial
 

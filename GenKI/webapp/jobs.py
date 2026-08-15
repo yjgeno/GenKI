@@ -116,6 +116,7 @@ class JobManager:
                 obs_label=params.obs_label,
                 grn_dir=self._grn_dir,
                 rebuild_grn=True,
+                n_cpus=params.n_cpus,
             )
 
             job.set_stage(STAGE_TRAINING)
