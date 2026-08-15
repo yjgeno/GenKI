@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Optional
 
 from anndata import AnnData
-from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from GenKI.preprocessing import build_adata
@@ -39,7 +39,8 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
+MAX_UPLOAD_MB = MAX_UPLOAD_BYTES // (1024 * 1024)
 
 
 def _find_example_dataset() -> Optional[Path]:
@@ -86,6 +87,24 @@ def create_app(grn_dir: str = "GRNs") -> FastAPI:
     app = FastAPI(title="GenKI", description="Local UI for GenKI knock-out inference")
     manager = JobManager(grn_dir=grn_dir)
 
+    # FastAPI's `UploadFile` parameter fully receives and spools the request
+    # body (via Starlette's multipart parser) before the route function ever
+    # runs, so a size check inside upload_dataset() only rejects *after* the
+    # whole file already crossed the wire. Reject up front from the
+    # Content-Length header instead, before any body parsing starts. The
+    # in-endpoint chunked check (below) stays as a fallback for the rare
+    # case Content-Length is absent or wrong (e.g. chunked transfer-encoding).
+    @app.middleware("http")
+    async def _reject_oversized_uploads(request: Request, call_next):
+        if request.url.path == "/api/datasets" and request.method == "POST":
+            content_length = request.headers.get("content-length")
+            if content_length is not None and int(content_length) > MAX_UPLOAD_BYTES:
+                return JSONResponse(
+                    {"detail": f"file too large (limit {MAX_UPLOAD_MB} MB)"},
+                    status_code=413,
+                )
+        return await call_next(request)
+
     # -- datasets -----------------------------------------------------
     @app.get("/api/datasets/example", response_model=DatasetInfo)
     def load_example_dataset():
@@ -111,7 +130,7 @@ def create_app(grn_dir: str = "GRNs") -> FastAPI:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
                 if size > MAX_UPLOAD_BYTES:
-                    raise HTTPException(413, "file too large (limit 500 MB)")
+                    raise HTTPException(413, f"file too large (limit {MAX_UPLOAD_MB} MB)")
                 tmp.write(chunk)
             tmp.close()
             try:
