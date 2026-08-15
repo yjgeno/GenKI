@@ -11,8 +11,9 @@ A Variational Graph Auto-Encoder (VGAE) model for predicting gene perturbation e
 </p>
 
 > 🆕 **New: a local web UI.** Run GenKI from your browser — no code required.
+> Requires **Python ≥ 3.10**.
 > ```shell
-> pip install "GenKI[web]"
+> pip install --no-cache-dir "GenKI[web]"
 > genki-ui
 > ```
 > Upload a `.h5ad`, pick a gene to knock out, and get ranked results in a few
@@ -89,10 +90,12 @@ Building the GRN in parallel needs the optional Ray extra (`pip install "GenKI[r
 
 Prefer clicking over scripting? Install the `web` extra and launch a local
 UI — upload a `.h5ad`, pick a target gene, and run the workflow from the
-browser, no code required:
+browser, no code required. Requires **Python ≥ 3.10**; on an older
+interpreter pip silently installs an ancient release without the `web`
+extra:
 
 ```shell
-pip install "GenKI[web]"
+pip install --no-cache-dir "GenKI[web]"
 genki-ui
 # opens http://127.0.0.1:8000
 ```
