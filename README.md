@@ -97,7 +97,7 @@ extra:
 ```shell
 pip install --no-cache-dir "GenKI[web]"
 genki-ui
-# opens http://127.0.0.1:8000
+# opens http://127.0.0.1:8931 (pass --port to use a different one)
 ```
 
 From a git checkout you can also skip the upload step and use the bundled
