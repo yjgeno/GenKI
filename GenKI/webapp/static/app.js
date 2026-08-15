@@ -182,6 +182,17 @@ function renderChips() {
 
 // -- run + poll -----------------------------------------------------
 
+// n_cpus must be a non-zero integer (-1 = all local cores); enforce via the
+// native constraint-validation bubble rather than a silent clamp.
+const nCpusInput = $("n-cpus");
+function validateNCpus() {
+  const v = Number(nCpusInput.value);
+  const valid = Number.isInteger(v) && (v === -1 || v > 0);
+  nCpusInput.setCustomValidity(valid ? "" : "must be -1 (all local CPUs) or a positive whole number");
+}
+nCpusInput.addEventListener("input", validateNCpus);
+validateNCpus();
+
 $("run-form").addEventListener("submit", async (evt) => {
   evt.preventDefault();
   const geneInput = $("target-gene-input");
@@ -205,6 +216,7 @@ $("run-form").addEventListener("submit", async (evt) => {
     seed: $("seed").value === "" ? null : Number($("seed").value),
     n_permutations: Number($("n-permutations").value),
     by: $("by").value,
+    n_cpus: Number(nCpusInput.value),
   };
 
   $("run-button").disabled = true;

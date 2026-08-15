@@ -107,7 +107,14 @@ locally; no data leaves your machine.
 
 Pick one or more genes to knock out, tune epochs/learning rate/permutations
 if you like, and hit **Run**. The UI shows the top 15 ranked genes at a
-glance; download the CSV for the full ranked list.
+glance; download the CSV for the full ranked list. Hover the ⓘ next to each
+field for a description of what it does.
+
+By default the GRN is built on a single core. Set **Parallel workers** to
+`-1` to use all local CPUs, or a positive integer for a specific count (`0`
+is invalid). Parallel builds need the optional Ray extra
+(`pip install "GenKI[ray]"`); without it, the UI silently falls back to a
+single process.
 
 ## GRN build time
 

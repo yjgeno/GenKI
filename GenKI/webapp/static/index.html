@@ -31,7 +31,9 @@
       <h2><span class="step">2</span> Configure run</h2>
       <form id="run-form">
         <label class="field">
-          Target gene(s) to knock out
+          <span class="field-label">Target gene(s) to knock out
+            <span class="info-icon" tabindex="0" data-tooltip="Gene(s) to virtually knock out. Their expression is zeroed and the model reports how much every other gene's inferred distribution shifts in response." aria-label="Gene(s) to virtually knock out. Their expression is zeroed and the model reports how much every other gene's inferred distribution shifts in response.">i</span>
+          </span>
           <input list="gene-list" id="target-gene-input" placeholder="type to search, press Enter to add" autocomplete="off">
           <datalist id="gene-list"></datalist>
         </label>
@@ -39,36 +41,56 @@
 
         <div class="grid">
           <label class="field" id="obs-label-field" hidden>
-            Cell metadata column
+            <span class="field-label">Cell metadata column
+              <span class="info-icon" tabindex="0" data-tooltip="The adata.obs column used to filter which cells are included, e.g. cell type or condition." aria-label="The adata.obs column used to filter which cells are included, e.g. cell type or condition.">i</span>
+            </span>
             <select id="obs-label-select"></select>
           </label>
           <label class="field" id="target-cell-field" hidden>
-            Cell filter
+            <span class="field-label">Cell filter
+              <span class="info-icon" tabindex="0" data-tooltip="Restrict the run to cells matching this value in the selected metadata column; leave as “All cells” to use everything." aria-label="Restrict the run to cells matching this value in the selected metadata column; leave as All cells to use everything.">i</span>
+            </span>
             <select id="target-cell-select"></select>
           </label>
           <label class="field">
-            Epochs
+            <span class="field-label">Epochs
+              <span class="info-icon" tabindex="0" data-tooltip="Number of training epochs for the VGAE encoder/decoder. More epochs can improve fit but take longer to train." aria-label="Number of training epochs for the VGAE encoder/decoder. More epochs can improve fit but take longer to train.">i</span>
+            </span>
             <input type="number" id="epochs" value="100" min="1" max="5000">
           </label>
           <label class="field">
-            Learning rate
+            <span class="field-label">Learning rate
+              <span class="info-icon" tabindex="0" data-tooltip="Adam optimizer learning rate used to train the VGAE." aria-label="Adam optimizer learning rate used to train the VGAE.">i</span>
+            </span>
             <input type="number" id="lr" value="0.0007" step="0.0001" min="0">
           </label>
           <label class="field">
-            Seed <span class="hint">(optional)</span>
+            <span class="field-label">Seed <span class="hint">(optional)</span>
+              <span class="info-icon" tabindex="0" data-tooltip="Random seed for reproducible training and permutation results; leave blank for a random seed each run." aria-label="Random seed for reproducible training and permutation results; leave blank for a random seed each run.">i</span>
+            </span>
             <input type="number" id="seed" placeholder="random">
           </label>
           <label class="field">
-            # permutations
+            <span class="field-label"># permutations
+              <span class="info-icon" tabindex="0" data-tooltip="Number of label-permutation samples used to build the null distribution for significance testing. 0 skips the permutation test." aria-label="Number of label-permutation samples used to build the null distribution for significance testing. 0 skips the permutation test.">i</span>
+            </span>
             <input type="number" id="n-permutations" value="100" min="0" max="2000">
           </label>
           <label class="field">
-            Distance metric
+            <span class="field-label">Distance metric
+              <span class="info-icon" tabindex="0" data-tooltip="How the knock-out vs wild-type latent distributions are compared per gene: KL divergence, Earth mover's distance, or a t-statistic." aria-label="How the knock-out vs wild-type latent distributions are compared per gene: KL divergence, Earth mover's distance, or a t-statistic.">i</span>
+            </span>
             <select id="by">
               <option value="KL" selected>KL divergence</option>
               <option value="EMD">Earth mover's distance</option>
               <option value="t">t-statistic</option>
             </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Parallel workers
+              <span class="info-icon" tabindex="0" data-tooltip="CPU workers used to build the gene regulatory network. -1 uses all local cores; must not be 0. Values other than 1 require the optional ray extra (pip install &quot;GenKI[ray]&quot;) &mdash; without it, the build silently falls back to a single process." aria-label="CPU workers used to build the gene regulatory network. -1 uses all local cores; must not be 0. Values other than 1 require the optional ray extra, pip install GenKI with the ray extra; without it, the build silently falls back to a single process.">i</span>
+            </span>
+            <input type="number" id="n-cpus" value="1" step="1" min="-1">
           </label>
         </div>
 

@@ -57,7 +57,11 @@ class scBase():
             self._counts = adata[adata.obs[obs_label] == target_cell, :].X
         self._counts = scipy.sparse.lil_matrix(self._counts) # sparse
 
-        cache_key = _hash_grn_inputs(adata.layers["norm"], {"nComp": 5, **kwargs})
+        # n_cpus only controls build parallelism, not the resulting network,
+        # so it's excluded from the cache key (otherwise switching worker
+        # count alone would force an identical GRN to be rebuilt).
+        hash_kwargs = {k: v for k, v in kwargs.items() if k != "n_cpus"}
+        cache_key = _hash_grn_inputs(adata.layers["norm"], {"nComp": 5, **hash_kwargs})
         cache_path = os.path.join(GRN_file_dir, f"{cache_key[:12]}.npz")
 
         if os.path.exists(cache_path):

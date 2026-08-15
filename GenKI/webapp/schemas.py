@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DatasetInfo(BaseModel):
@@ -29,6 +29,20 @@ class JobCreate(BaseModel):
     seed: Optional[int] = None
     n_permutations: int = Field(100, ge=0, le=2000)
     by: str = "KL"
+    n_cpus: int = Field(
+        1,
+        description=(
+            "parallel workers for GRN construction; -1 uses all local CPUs. "
+            "Requires the optional ray extra (GenKI[ray]) for values other than 1."
+        ),
+    )
+
+    @field_validator("n_cpus")
+    @classmethod
+    def _n_cpus_valid(cls, v: int) -> int:
+        if v == 0 or v < -1:
+            raise ValueError("n_cpus must be -1 (all local CPUs) or a positive integer")
+        return v
 
 
 class JobCreated(BaseModel):
