@@ -75,6 +75,29 @@ def test_upload_dataset_returns_shape_and_genes(client, small_h5ad_path, small_a
     assert len(info["gene_names"]) == small_adata.n_vars
 
 
+def test_upload_rejects_oversized_content_length(client):
+    """A too-large Content-Length is rejected before the body is read.
+
+    Sends a tiny body with a spoofed huge Content-Length header: if this
+    passed, it'd mean the middleware read the (nonexistent) rest of the
+    body rather than rejecting from the header alone, i.e. the whole point
+    of checking Content-Length up front (skip parsing multi-GB uploads)
+    would be broken.
+    """
+    from GenKI.webapp.main import MAX_UPLOAD_BYTES
+
+    resp = client.post(
+        "/api/datasets",
+        content=b"not actually a big file",
+        headers={
+            "content-length": str(MAX_UPLOAD_BYTES + 1),
+            "content-type": "multipart/form-data; boundary=x",
+        },
+    )
+    assert resp.status_code == 413
+    assert "too large" in resp.json()["detail"]
+
+
 def test_upload_rejects_non_h5ad(client, tmp_path):
     bogus = tmp_path / "not_h5ad.txt"
     bogus.write_text("nope")
